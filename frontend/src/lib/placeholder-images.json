@@ -1,0 +1,52 @@
+{
+  "placeholderImages": [
+    {
+      "id": "product-1",
+      "description": "A stylish women's floral print blouse.",
+      "imageUrl": "https://images.unsplash.com/photo-1685278463552-51396b0a6287?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8d29tZW5zJTIwYmxvdXNlfGVufDB8fHx8MTc2MTYyMTI5OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "womens blouse"
+    },
+    {
+      "id": "product-2",
+      "description": "A classic men's leather strap watch.",
+      "imageUrl": "https://images.unsplash.com/photo-1580864613867-baea61cfd946?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8bWVucyUyMHdhdGNofGVufDB8fHx8MTc2MTYyMTI5OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mens watch"
+    },
+    {
+      "id": "product-3",
+      "description": "Elegant diamond stud earrings.",
+      "imageUrl": "https://images.unsplash.com/photo-1693212793204-bcea856c75fe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxkaWFtb25kJTIwZWFycmluZ3N8ZW58MHx8fHwxNzYxNTA4OTAyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "diamond earrings"
+    },
+    {
+      "id": "product-4",
+      "description": "Women's high-heel leather ankle boots.",
+      "imageUrl": "https://images.unsplash.com/photo-1662280700165-129b82569b88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3b21lbnMlMjBib290c3xlbnwwfHx8fDE3NjE2MjEyOTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "womens boots"
+    },
+    {
+      "id": "product-5",
+      "description": "Men's slim-fit dark wash jeans.",
+      "imageUrl": "https://images.unsplash.com/photo-1714143136372-ddaf8b606da7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtZW5zJTIwamVhbnN8ZW58MHx8fHwxNzYxNjIxMjk5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mens jeans"
+    },
+    {
+      "id": "product-6",
+      "description": "A sophisticated women's trench coat.",
+      "imageUrl": "https://images.unsplash.com/photo-1611025035970-27e2a8e9e09f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3b21lbnMlMjBjb2F0fGVufDB8fHx8MTc2MTYyMTI5OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "womens coat"
+    },
+    {
+      "id": "product-7",
+      "description": "A sterling silver pendant necklace.",
+      "imageUrl": "https://images.unsplash.com/photo-1676329947145-99145926d3eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzaWx2ZXIlMjBuZWNrbGFjZXxlbnwwfHx8fDE3NjE1NzE5Mjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silver necklace"
+    },
+    {
+      "id": "product-8",
+      "description": "Men's classic suede derby shoes.",
+      "imageUrl": "https://images.unsplash.com/photo-1616406432452-07bc5938759d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxtZW5zJTIwc2hvZXN8ZW58MHx8fHwxNzYxNjIxMjk5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mens shoes"
+    }
+  ]
+}

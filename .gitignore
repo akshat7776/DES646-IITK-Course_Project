@@ -1,0 +1,74 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.history/
+
+# Python caches & build
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.pytype/
+.cache/
+.ipynb_checkpoints/
+.build/
+dist/
+build/
+.eggs/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Logs & coverage
+*.log
+logs/
+.coverage*
+*.coverage
+htmlcov/
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Data & outputs (adjust if you want to commit these)
+outputs/
+Womens Clothing E-Commerce Reviews.csv
+
+# FAISS indexes and artifacts
+faiss_index/
+faiss_index_native/
+**/index.faiss
+**/index_native.faiss
+**/metadata.json
+
+# Frontend (Next.js / Node)
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.swc/
+frontend/.cache/
+frontend/out/
+frontend/coverage/
+frontend/npm-debug.log*
+frontend/yarn-error.log
+frontend/.env
+frontend/.env.*
+
+# Jupyter notebooks checkpoints are covered above; keep notebooks themselves
+
+# Temporary/backup files
+*.tmp
+*.bak
+*~
+~$*
