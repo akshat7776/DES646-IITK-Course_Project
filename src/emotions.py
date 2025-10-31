@@ -1,55 +1,99 @@
-import os, sys, json
-from dotenv import load_dotenv
-load_dotenv()
+import os
+import sys
+import json
+from typing import List, Dict, Tuple
+
+import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 
 try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-except Exception:  
-    ChatGoogleGenerativeAI = None  
-
-EMOTIONS = ["joy", "sadness", "anger", "fear", "surprise", "disgust", "neutral"]
+	from sentence_transformers import SentenceTransformer
+except Exception as e:  # pragma: no cover
+	SentenceTransformer = None  # type: ignore
 
 
-def classify(text: str, model: str = "gemini-2.5-flash") -> dict:
-    if ChatGoogleGenerativeAI is None:
-        raise RuntimeError("Please install langchain-google-genai")
-    key = os.getenv("GEMINI_API_KEY") 
-    if not key:
-        raise RuntimeError("Set GEMINI_API_KEY")
+EMOTIONS: List[str] = [
+	"joy", "sadness", "anger", "fear", "surprise", "neutral"
+]
 
-    llm = ChatGoogleGenerativeAI(model=model, temperature=0.1, max_output_tokens=256, google_api_key=key)
-    prompt = (
-        "Classify the product review into a single emotion from: "
-        + ", ".join(EMOTIONS)
-        + ". Return JSON: {\"emotion\": \"<label>\", \"scores\": {\"label\": prob}}\n"
-        "Text:\n" + text
-    )
+EMOTION_PROMPTS: Dict[str, str] = {
+	"joy": "This text expresses joy, happiness, or delight.",
+	"sadness": "This text expresses sadness, disappointment, or sorrow.",
+	"anger": "This text expresses anger, frustration, or annoyance.",
+	"fear": "This text expresses fear, anxiety, or worry.",
+	"surprise": "This text expresses surprise or astonishment.",
+	"neutral": "This text is neutral or matter-of-fact without strong emotion.",
+}
 
-    try:
-        r = llm.invoke(prompt)
-        s = getattr(r, "content", str(r)).strip()
-        i, j = s.find("{"), s.rfind("}")
-        if i != -1 and j != -1 and j > i:
-            s = s[i : j + 1]
-        data = json.loads(s)
-        emo = str(data.get("emotion", "neutral")).lower()
-        if emo not in EMOTIONS:
-            emo = "neutral"
-        scores = data.get("scores", {})
-        if not isinstance(scores, dict):
-            scores = {}
-        return {"emotion": emo, "scores": scores}
-    except Exception:
-        return {"emotion": "neutral", "scores": {}}
+
+def _load_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+	if SentenceTransformer is None:
+		raise RuntimeError("Please install 'sentence-transformers' package")
+	return SentenceTransformer(model_name)
+
+
+def _embed(model, texts: List[str]) -> np.ndarray:
+	return np.asarray(model.encode(texts, normalize_embeddings=True))
+
+
+def _kmeans_cluster(embeddings: np.ndarray, k: int, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray]:
+	kmeans = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+	labels = kmeans.fit_predict(embeddings)
+	centers = kmeans.cluster_centers_
+	return labels, centers
+
+
+def _label_clusters(centers: np.ndarray, emotion_embs: np.ndarray, emotion_names: List[str]) -> Dict[int, str]:
+	# centers: (k, d), emotion_embs: (7, d)
+	sims = cosine_similarity(centers, emotion_embs)  # (k, 7)
+	cluster_to_emotion: Dict[int, str] = {}
+	for i in range(centers.shape[0]):
+		j = int(np.argmax(sims[i]))
+		cluster_to_emotion[i] = emotion_names[j]
+	return cluster_to_emotion
+
+
+def cluster_emotions(
+	texts: List[str],
+	*,
+	k: int = 7,
+	model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+) -> List[str]:
+	"""Cluster texts and return an emotion label per text using centroid similarity.
+
+	Steps:
+	- Embed texts
+	- KMeans cluster with k clusters
+	- Embed emotion prompts, map centers to nearest emotion
+	- Return mapped emotion for each text
+	"""
+	if not texts:
+		return []
+
+	model = _load_model(model_name)
+	X = _embed(model, texts)
+	# If number of texts < k, reduce k
+	k_eff = max(1, min(k, len(texts)))
+	labels, centers = _kmeans_cluster(X, k=k_eff)
+
+	# Emotion reference embeddings
+	emotion_prompts = [EMOTION_PROMPTS[e] for e in EMOTIONS]
+	E = _embed(model, emotion_prompts)
+
+	cluster_to_emotion = _label_clusters(centers, E, EMOTIONS)
+	# Map each text's cluster to an emotion
+	return [cluster_to_emotion[int(c)] for c in labels]
 
 
 if __name__ == "__main__":
-    feedback = [
-        # Add your feedback strings here:
-        "hated the fabric ",
-        # "The color was totally different than pictured",
-    ]
+	# If run directly, cluster a small set of feedbacks below.
+	feedback = [
+		# Add your feedback strings here:
+		"This shirt is very flattering to all due to the adjustable front tie. it is the perfect length to wear with leggings and it is sleeveless so it pairs well with any cardigan. love this shirt!!!"
+	]
+	preds = cluster_emotions(feedback, k=7)
+	for emo in preds:
+		print(f"EMOTION: {emo}")
 
-    for txt in feedback:
-        res = classify(txt)
-        print(json.dumps({**res}, ensure_ascii=False))
