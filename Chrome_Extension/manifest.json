@@ -1,0 +1,40 @@
+{
+	"manifest_version": 3,
+	"name": "Feedback Analyzer – Extension",
+	"description": "Analyze customer feedback on local product pages via FastAPI backend.",
+	"version": "1.0.0",
+	"action": {
+		"default_title": "Analyze Feedback",
+		"default_popup": "popup.html"
+	},
+	"permissions": [
+		"activeTab",
+		"scripting",
+		"storage"
+	],
+			"host_permissions": [
+				"http://localhost:9002/*",
+				"https://localhost:9002/*",
+				"http://172.17.190.228:9002/*",
+				"https://172.17.190.228:9002/*",
+				"http://127.0.0.1:8000/*"
+			],
+	"background": {
+		"service_worker": "background.js",
+		"type": "module"
+	},
+		"content_scripts": [
+			{
+						"matches": [
+							"http://localhost:9002/products/*",
+							"https://localhost:9002/products/*",
+							"http://172.17.190.228:9002/products/*",
+							"https://172.17.190.228:9002/products/*"
+						],
+				"js": [
+					"content.js"
+				],
+				"run_at": "document_idle"
+			}
+		]
+}

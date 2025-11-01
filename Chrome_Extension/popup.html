@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback Analyzer</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 0; width: 380px; }
+      header { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+      h1 { font-size: 14px; margin: 0; font-weight: 600; color: #111827; }
+      main { padding: 12px 14px; max-height: 540px; overflow-y: auto; }
+      .btn { background:#111827; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size: 12px; }
+      .muted { color:#6b7280; }
+      .card { border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin-bottom:10px; }
+      .chips { display:flex; gap:6px; flex-wrap: wrap; margin: 6px 0; }
+      .chip { font-size: 11px; background:#f3f4f6; padding:4px 6px; border-radius:999px; }
+      .stat { display:flex; gap:8px; }
+      .label { color:#6b7280; font-size: 12px; }
+      .value { color:#111827; font-weight:600; }
+      .error { color:#b91c1c; background:#fef2f2; border:1px solid #fee2e2; padding:8px; border-radius:6px; }
+      .spinner { width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top: 2px solid #111827; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Feedback Analyzer</h1>
+      <button id="refresh" class="btn" title="Re-extract & Analyze">Analyze</button>
+    </header>
+    <main>
+      <div id="status" class="muted">Idle</div>
+
+      <div id="aggregate" style="margin-top:10px; display:none;">
+        <div class="card">
+          <div class="stat"><span class="label">Average NPS:</span> <span class="value" id="avgNps">-</span></div>
+          <div class="stat"><span class="label">Dominant Sentiment:</span> <span class="value" id="domSent">-</span></div>
+          <div style="margin-top:6px;" class="label">Summary</div>
+          <div id="summary" style="margin-top:4px;">—</div>
+        </div>
+      </div>
+
+      <div id="reviews"></div>
+
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
