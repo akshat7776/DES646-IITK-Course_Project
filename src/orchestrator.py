@@ -5,16 +5,28 @@ import json
 import os
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, Optional
-from dotenv import load_dotenv
-load_dotenv()
+try:
+	from dotenv import load_dotenv  # type: ignore
+	load_dotenv()
+except Exception:
+	pass
 
 import numpy as np
 import pandas as pd
 
-# Local modules
-from . import sentiment as sentiment_mod
-from . import emotions as emotions_mod
-from . import intent as intents_mod
+# Local modules (work both as package and as standalone script directory)
+try:
+	# When executed as a package (e.g., python -m src.orchestrator)
+	from . import sentiment as sentiment_mod  # type: ignore
+	from . import emotions as emotions_mod  # type: ignore
+	from . import intent as intents_mod  # type: ignore
+except Exception:
+	# When imported from a sibling (e.g., serve_rag.py in same folder)
+	import sys as _sys, os as _os
+	_sys.path.append(_os.path.dirname(__file__))
+	import sentiment as sentiment_mod  # type: ignore
+	import emotions as emotions_mod  # type: ignore
+	import intent as intents_mod  # type: ignore
 
 
 def _get_api_key() -> Optional[str]:
@@ -194,8 +206,7 @@ def gemini_predict(text: str, signals: OrchestratedSignals) -> GeminiPrediction:
 			"reason": f"Fallback (no model JSON). finish_reason={finish_reason}",
 		}
 
-	repeat_purchase = bool(data.
-    get("repeat_purchase", False))
+	repeat_purchase = bool(data.get("repeat_purchase", False))
 	try:
 		nps_score = int(data.get("nps_score", 0))
 	except Exception:
