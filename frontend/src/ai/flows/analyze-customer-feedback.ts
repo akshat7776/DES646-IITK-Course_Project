@@ -56,7 +56,65 @@ const analyzeCustomerFeedbackFlow = ai.defineFlow(
     outputSchema: AnalyzeCustomerFeedbackOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    // Try the LLM prompt with retries and exponential backoff on rate-limit or transient errors.
+    const maxRetries = 3;
+    let attempt = 0;
+
+    async function sleep(ms: number) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    while (true) {
+      try {
+        const {output} = await prompt(input);
+        return output!;
+      } catch (err: any) {
+        attempt++;
+        const msg = String(err?.message || err);
+
+        // If it's a rate limit / quota error (429) or network glitch, retry with backoff.
+        const isRetryable = /quota exceeded|429|Too Many Requests|rate limit/i.test(msg);
+
+        if (attempt <= maxRetries && isRetryable) {
+          const backoff = Math.round(1000 * Math.pow(2, attempt - 1));
+          // jitter
+          const jitter = Math.round(Math.random() * 300);
+          await sleep(backoff + jitter);
+          continue;
+        }
+
+        // If retries exhausted or non-retryable, fall back to a lightweight heuristic analyzer.
+        console.warn('LLM call failed or quota exceeded, falling back to heuristic analysis:', msg);
+        const heuristic = heuristicAnalyze(input.feedback);
+        return heuristic as any;
+      }
+    }
   }
 );
+
+// Simple heuristic fallback: keyword-based sentiment and tag extraction.
+function heuristicAnalyze(feedback: string) {
+  const posWords = ['good', 'great', 'excellent', 'love', 'perfect', 'comfortable', 'best', 'nice', 'amazing', 'recommend'];
+  const negWords = ['bad', 'poor', 'terrible', 'disappointed', 'hate', 'awful', 'broken', 'worst', 'cheap', 'problem'];
+
+  const text = (feedback || '').toLowerCase();
+  let posCount = 0;
+  let negCount = 0;
+  const tags = new Set<string>();
+
+  for (const w of posWords) if (text.includes(w)) { posCount++; tags.add(w); }
+  for (const w of negWords) if (text.includes(w)) { negCount++; tags.add(w); }
+
+  const sentiment = posCount > negCount ? 'positive' : negCount > posCount ? 'negative' : 'neutral';
+
+  // crude emotion/intent guesses
+  const emotion = posCount > negCount ? 'satisfied' : negCount > posCount ? 'frustrated' : 'indifferent';
+  const intent = text.includes('return') || text.includes('refund') ? 'request refund' : text.includes('buy') ? 'purchase intent' : 'give feedback';
+
+  return {
+    sentiment: sentiment as 'positive' | 'negative' | 'neutral',
+    emotion,
+    intent,
+    tags: Array.from(tags).slice(0, 8),
+  };
+}

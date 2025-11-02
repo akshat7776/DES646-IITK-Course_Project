@@ -23,6 +23,7 @@ export function DepartmentClientPage({ departments }: DepartmentClientPageProps)
   };
 
   const handleClassClick = (product: Product) => {
+    // Navigate to the detail page style (like the second screenshot)
     router.push(`/products/${product.id}`);
   };
 
@@ -64,6 +65,7 @@ export function DepartmentClientPage({ departments }: DepartmentClientPageProps)
               />
             ))}
           </div>
+          {/* Modal no longer used when navigating to the product page */}
         </div>
       )}
     </div>

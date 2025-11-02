@@ -1,39 +1,7 @@
-import { generateSentimentTags } from "@/ai/flows/generate-sentiment-tags";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { formatDate } from "@/lib/utils";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RatingStars } from "./rating-stars";
 import type { Review } from "@/lib/types";
-import { Suspense } from "react";
-import { Skeleton } from "./ui/skeleton";
-
-async function SentimentTags({ text }: { text: string }) {
-  try {
-    const { tags } = await generateSentimentTags({ text });
-    return (
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag, index) => (
-          <Badge key={index} variant="secondary" className="capitalize">
-            {tag}
-          </Badge>
-        ))}
-      </div>
-    );
-  } catch (error) {
-    console.error("Failed to generate sentiment tags:", error);
-    return null;
-  }
-}
-
-function TagsSkeleton() {
-    return (
-        <div className="flex flex-wrap gap-2">
-            <Skeleton className="h-6 w-20" />
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-6 w-24" />
-        </div>
-    )
-}
+// Note: We intentionally removed auto AI tag generation to avoid API rate limits.
 
 export function ReviewCard({ review }: { review: Review }) {
   return (
@@ -41,8 +9,15 @@ export function ReviewCard({ review }: { review: Review }) {
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
             <div>
-                <p className="font-semibold font-headline">{review.author}</p>
-                <p className="text-xs text-muted-foreground">{formatDate(review.date)}</p>
+                <p className="font-semibold font-headline">{review.author || review.title || "Anonymous"}</p>
+                {/* Removed date from feedbacks as requested */}
+                {(review.age || review.clothingId) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {review.age ? `Age: ${review.age}` : ''}
+                    {review.age && review.clothingId ? ' • ' : ''}
+                    {review.clothingId ? `Clothing ID: ${review.clothingId}` : ''}
+                  </p>
+                )}
             </div>
             <RatingStars rating={review.rating} />
         </div>
@@ -50,11 +25,6 @@ export function ReviewCard({ review }: { review: Review }) {
       <CardContent>
         <p className="text-foreground/80 italic">"{review.text}"</p>
       </CardContent>
-      <CardFooter>
-        <Suspense fallback={<TagsSkeleton />}>
-          <SentimentTags text={review.text} />
-        </Suspense>
-      </CardFooter>
     </Card>
   );
 }

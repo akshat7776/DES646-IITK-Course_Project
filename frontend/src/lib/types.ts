@@ -4,6 +4,10 @@ export type Review = {
   date: string;
   rating: number; // 1-5
   text: string;
+  // Optional fields carried from CSV when available
+  title?: string;
+  age?: number;
+  clothingId?: number;
 };
 
 export type Product = {

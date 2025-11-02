@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import type { Department } from "@/lib/types";
 
 interface DepartmentCardProps {
@@ -23,10 +24,13 @@ export function DepartmentCard({ department, onClick }: DepartmentCardProps) {
         className="object-cover transition-transform duration-300 group-hover:scale-105"
         data-ai-hint={department.imageHint}
       />
-      <CardContent className="relative z-20 flex h-48 items-end justify-start p-4">
+      <CardContent className="relative z-20 flex h-48 items-end justify-between p-4">
         <h3 className="text-2xl font-bold text-white font-headline">
           {department.name}
         </h3>
+        <Badge variant="secondary" className="bg-white/90 text-black">
+          {department.classes.length} classes
+        </Badge>
       </CardContent>
     </Card>
   );

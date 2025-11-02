@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { products } from '@/lib/data';
+import { getCsvProductById } from '@/lib/reviews-data';
 import { getImageById } from '@/lib/images';
 import { calculateAverageRating, formatDate } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,11 +18,16 @@ const departmentIcons: { [key: string]: React.ReactNode } = {
   Shoes: <Footprints className="h-4 w-4" />,
 };
 
-export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const product = products.find((p) => p.id === params.id);
-
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  let product = products.find((p) => p.id === id);
   if (!product) {
-    notFound();
+    // Attempt to resolve from CSV-derived classes
+    const csvProduct = await getCsvProductById(id);
+    if (!csvProduct) {
+      notFound();
+    }
+    product = csvProduct;
   }
 
   const productImage = getImageById(product.imageId);
@@ -54,7 +60,9 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
                 {departmentIcons[product.department]}
                 <span className="ml-2">{product.department}</span>
               </Badge>
-              <p className="text-sm text-muted-foreground">{product.productAge} on market</p>
+              {product.productAge && (
+                <p className="text-sm text-muted-foreground">{product.productAge} on market</p>
+              )}
             </div>
             <h1 className="text-5xl font-bold tracking-tight">{product.name}</h1>
             <div className="flex items-center gap-2">
