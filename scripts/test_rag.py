@@ -18,7 +18,7 @@ HEALTH_URL = "http://127.0.0.1:8000/health"
 
 def parse_args():
     p = argparse.ArgumentParser(description="Test the local RAG server")
-    p.add_argument("--query", type=str, default="What is sum?", help="Query text to send")
+    p.add_argument("--query", type=str, default="What things customers are not like?", help="Query text to send")
     p.add_argument("--url", type=str, default=DEFAULT_URL, help="Full query endpoint URL")
     p.add_argument("--count", type=int, default=1, help="Number of repeated requests")
     p.add_argument("--delay", type=float, default=0.0, help="Seconds to wait between requests")
