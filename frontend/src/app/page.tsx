@@ -3,6 +3,7 @@ import { DepartmentClientPage } from '@/components/departments/department-client
 import { Product } from '@/lib/types';
 import { FeedbackAnalyzer } from '@/components/feedback-analyzer';
 import { Separator } from '@/components/ui/separator';
+import ReviewsByDeptViewer from '@/components/reviews-by-dept';
 
 export type Department = {
   name: string;
@@ -46,6 +47,14 @@ export default function Home() {
         <p className="mt-2 text-lg text-muted-foreground">Explore feedback by category.</p>
       </header>
       <DepartmentClientPage departments={departments} />
+
+      <Separator className="my-8" />
+
+      <section>
+        <h2 className="text-3xl font-bold">Reviews by Department</h2>
+        <p className="text-muted-foreground">Data sourced from outputs/clean_reviews_by_dept.json</p>
+        <ReviewsByDeptViewer />
+      </section>
     </div>
   );
 }

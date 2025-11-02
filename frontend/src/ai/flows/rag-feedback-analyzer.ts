@@ -1,59 +1,47 @@
-'use server';
 /**
- * @fileOverview A RAG-based AI agent for analyzing product feedback.
+ * @fileOverview Frontend helper to call the Python FastAPI RAG backend.
  *
- * - analyzeFeedbackWithRAG - A function that answers questions about product feedback using a RAG pattern.
- * - RAGInput - The input type for the function.
- * - RAGOutput - The return type for the function.
+ * We previously used a Genkit prompt with inline context. Now we connect the
+ * website to the real RAG service at /query, which performs retrieval over
+ * the FAISS index and returns an answer plus optional sources.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+export type RAGInput = {
+  query: string;
+  // Kept for backward-compat with existing callers; ignored by the backend.
+  context?: string;
+};
 
-const RAGInputSchema = z.object({
-  query: z.string().describe('The user\'s question about the product feedback.'),
-  context: z.string().describe('A collection of all relevant product reviews and feedback.'),
-});
-export type RAGInput = z.infer<typeof RAGInputSchema>;
+export type RAGSource = {
+  metadata?: Record<string, unknown>;
+  text_snippet?: string;
+};
 
-const RAGOutputSchema = z.object({
-  answer: z.string().describe('The AI-generated answer to the user\'s query.'),
-});
-export type RAGOutput = z.infer<typeof RAGOutputSchema>;
+export type RAGOutput = {
+  answer: string;
+  sources?: RAGSource[];
+  include_sources?: boolean;
+};
 
 export async function analyzeFeedbackWithRAG(input: RAGInput): Promise<RAGOutput> {
-  return ragFlow(input);
-}
+  const baseUrl = process.env.NEXT_PUBLIC_RAG_API_BASE?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+  const res = await fetch(`${baseUrl}/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: input.query }),
+    // Always use fetch from the browser or server with CORS enabled in FastAPI
+    cache: 'no-store',
+  });
 
-const ragPrompt = ai.definePrompt({
-  name: 'ragFeedbackPrompt',
-  input: { schema: RAGInputSchema },
-  output: { schema: RAGOutputSchema },
-  prompt: `You are an expert product feedback analyst for a fashion e-commerce company.
-Your goal is to answer questions from product designers based on a provided set of customer reviews.
-Use only the information from the reviews (context) to answer the user's query.
-Be concise and focus on actionable insights. Synthesize information from multiple reviews if possible.
-
-CONTEXT (Customer Reviews):
----
-{{{context}}}
----
-
-USER QUERY:
-"{{{query}}}"
-
-Based on the reviews, provide a clear and helpful answer to the query.
-`,
-});
-
-const ragFlow = ai.defineFlow(
-  {
-    name: 'ragFeedbackFlow',
-    inputSchema: RAGInputSchema,
-    outputSchema: RAGOutputSchema,
-  },
-  async (input) => {
-    const { output } = await ragPrompt(input);
-    return output!;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`RAG API error ${res.status}: ${text || res.statusText}`);
   }
-);
+
+  const data = (await res.json()) as { answer: string; sources?: RAGSource[]; include_sources?: boolean };
+  return {
+    answer: data.answer ?? '',
+    sources: data.sources ?? [],
+    include_sources: data.include_sources ?? false,
+  };
+}

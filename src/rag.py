@@ -360,8 +360,8 @@ if __name__ == "__main__":
         response = rag_engine.answer(user_query)
         print("Answer:", response["answer"])
         if response.get("include_sources"):
-            print("\nSources (up to 4):")
-            for s in response["sources"][:4]:
+            print("\nSources (up to 3):")
+            for s in response["sources"][:3]:
                 md = s.get("metadata", {}) or {}
                 print({
                     "Clothing ID": md.get("Clothing ID", ""),

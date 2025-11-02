@@ -72,3 +72,26 @@ frontend/.env.*
 *.bak
 *~
 ~$*
+
+# IDE & tool specifics
+.idea/
+.python-version
+.ruff_cache/
+
+# Model artifacts
+models/
+**/*.joblib
+**/*.pkl
+
+# Coverage reports
+coverage.xml
+
+# Vercel (if used at repo root)
+.vercel/
+
+# Root-level Node logs
+npm-debug.log*
+yarn-error.log*
+
+# Shell/env helpers
+.envrc

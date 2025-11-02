@@ -17,13 +17,13 @@ function setStatus(text, loading = false, isError = false) {
 
 function renderAggregate(data) {
   const agg = document.getElementById('aggregate');
-  const avgNps = document.getElementById('avgNps');
+  const avgRating = document.getElementById('avgRating');
   const domSent = document.getElementById('domSent');
   const summary = document.getElementById('summary');
 
-  if (!agg || !avgNps || !domSent || !summary) return;
+  if (!agg || !avgRating || !domSent || !summary) return;
 
-  if (typeof data.average_nps === 'number') avgNps.textContent = data.average_nps.toFixed(1);
+  if (typeof data.average_rating === 'number') avgRating.textContent = data.average_rating.toFixed(1);
   if (data.dominant_sentiment) domSent.textContent = data.dominant_sentiment;
   if (data.summary) summary.textContent = data.summary;
 
@@ -118,12 +118,18 @@ async function analyze() {
       throw new Error(`Backend error ${resp.status}: ${t}`);
     }
 
-    const data = await resp.json();
+    let data;
+    try {
+      data = await resp.json();
+    } catch (parseErr) {
+      const t = await resp.text();
+      throw new Error(`Invalid JSON from backend: ${String(parseErr)} | body: ${t.slice(0, 200)}...`);
+    }
     setStatus('Done');
 
     if (data) {
-      renderAggregate(data);
-      renderReviews(data.reviews || []);
+      try { renderAggregate(data); } catch (e) { console.error('renderAggregate failed', e, data); }
+      try { renderReviews(data.reviews || []); } catch (e) { console.error('renderReviews failed', e, data); }
     }
   } catch (err) {
     console.error(err);

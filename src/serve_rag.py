@@ -9,6 +9,7 @@ import uvicorn
 # Import your RAG implementation
 from rag import RAGbot
 from orchestrator import analyze_text  # single-feedback analyzer (sentiment/emotion/intent + Gemini)
+from reply import ReplyGenerator
 
 # Configuration - adjust paths if needed
 ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -16,7 +17,7 @@ CSV_PATH = os.path.join(ROOT, "outputs", "clean_csv.csv")
 PERSIST_PATH = os.path.join(ROOT, "faiss_index")
 NATIVE_PATH = os.path.join(ROOT, "faiss_index_native")
 CHUNK_SIZE = 500
-K = 5
+K = 3
 
 app = FastAPI(title="RAG Server - keeps FAISS & LLM in memory")
 
@@ -62,20 +63,23 @@ class ReviewOut(BaseModel):
     intent: str
     nps: float
     buy_again: str
+    reply: Optional[str] = None
 
 
 class AnalyzeResponse(BaseModel):
     reviews: List[ReviewOut]
-    average_nps: float
+    average_rating: Optional[float] = None
+    average_nps: Optional[float] = None
     dominant_sentiment: str
     summary: str
 
 # Global RAG instance
 RAG: RAGbot | None = None
+REPLY: ReplyGenerator | None = None
 
 @app.on_event("startup")
 def startup_event():
-    global RAG
+    global RAG, REPLY
     # Load dataframe once (if you have a different location, change CSV_PATH)
     if not os.path.exists(CSV_PATH):
         raise RuntimeError(f"CSV file not found at {CSV_PATH}")
@@ -86,6 +90,14 @@ def startup_event():
     print("Starting RAG server - initializing RAGbot (this happens once on startup)")
     RAG = RAGbot(df, k=K, persist_path=PERSIST_PATH, chunk_size=CHUNK_SIZE, force_rebuild=False)
     print("RAG server ready: index loaded and models initialized")
+
+    # Initialize ReplyGenerator (optional; fall back if not available)
+    try:
+        REPLY = ReplyGenerator()
+        print("ReplyGenerator ready")
+    except Exception as e:
+        REPLY = None
+        print(f"ReplyGenerator init failed: {e}")
 
 @app.post("/query", response_model=QueryResponse)
 def query_endpoint(req: QueryRequest):
@@ -121,6 +133,27 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
         nps = float(res.prediction.nps_score)
         buy = "Yes" if res.prediction.repeat_purchase else "No"
 
+        # Reply generation: prefer LLM ReplyGenerator, fall back to a template
+        def _templated_reply(text: str, sentiment: str, emotion: str, intent: str) -> str:
+            base = "Thanks for your feedback."
+            if intent == "size_issue":
+                base = "Thanks for sharing your sizing experience."
+            elif intent in ("quality_concern", "complaint"):
+                base = "Sorry about your experience."
+            elif intent == "praise":
+                base = "Thanks for the kind words!"
+            tail = " We'll share this with our team. If you need help, please reach us via support."
+            return f"{base} ({sentiment}, {emotion}).{tail}"
+
+        reply_text: Optional[str] = None
+        try:
+            if REPLY is not None:
+                reply_text = REPLY.generate_reply(txt)
+        except Exception as _:
+            reply_text = None
+        if not reply_text:
+            reply_text = _templated_reply(txt, sent, emo, intent)
+
         items.append(ReviewOut(
             review=txt,
             sentiment=sent,
@@ -128,6 +161,7 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
             intent=intent,
             nps=nps,
             buy_again=buy,
+            reply=reply_text,
         ))
         sentiments.append(sent)
         nps_values.append(nps)
@@ -136,7 +170,9 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
         raise HTTPException(status_code=400, detail="no valid reviews after filtering")
 
     # Aggregates
-    avg_nps = float(sum(nps_values) / max(len(nps_values), 1))
+    avg_nps = float(sum(nps_values) / max(len(nps_values), 1)) if nps_values else None
+    ratings = [float(r.rating) for r in req.reviews if r.rating is not None]
+    avg_rating = float(sum(ratings) / len(ratings)) if ratings else None
     # Dominant sentiment by frequency
     dom_sent = max(set(sentiments), key=sentiments.count) if sentiments else "neutral"
 
@@ -146,16 +182,80 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
     for it in [it.intent for it in items]:
         top_intents[it] = top_intents.get(it, 0) + 1
     top_intent = max(top_intents.items(), key=lambda kv: kv[1])[0] if top_intents else "other"
-    summary = (
-        f"Analyzed {len(items)} reviews. Dominant sentiment is '{dom_sent}'. "
-        f"Most common intent appears to be '{top_intent}'. Average NPS is {avg_nps:.1f}."
-    )
+    if avg_rating is not None:
+        summary = (
+            f"Analyzed {len(items)} reviews. Dominant sentiment is '{dom_sent}'. "
+            f"Most common intent appears to be '{top_intent}'. Average rating is {avg_rating:.1f}."
+        )
+    else:
+        summary = (
+            f"Analyzed {len(items)} reviews. Dominant sentiment is '{dom_sent}'. "
+            f"Most common intent appears to be '{top_intent}'."
+        )
 
     return AnalyzeResponse(
         reviews=items,
+        average_rating=avg_rating,
         average_nps=avg_nps,
         dominant_sentiment=dom_sent,
         summary=summary,
+    )
+
+
+# ---- Single review analysis (for inline per-review action) ------------------
+class SingleAnalyzeRequest(BaseModel):
+    text: str
+    rating: Optional[float] = None
+    author: Optional[str] = None
+    product: Optional[ProductIn] = None
+
+
+@app.post("/analyze_review", response_model=ReviewOut)
+def analyze_review_endpoint(req: SingleAnalyzeRequest):
+    txt = (req.text or "").strip()
+    if not txt:
+        raise HTTPException(status_code=400, detail="text is empty")
+    try:
+        res = analyze_text(txt)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"orchestrator error: {e}")
+
+    sent = res.signals.sentiment_label
+    emo = res.signals.emotion
+    intent = res.signals.intent
+    nps = float(res.prediction.nps_score)
+    buy = "Yes" if res.prediction.repeat_purchase else "No"
+
+    # Reply via ReplyGenerator if available; fallback template otherwise
+    def _templated_reply(text: str, sentiment: str, emotion: str, intent: str) -> str:
+        base = "Thanks for your feedback."
+        if intent == "size_issue":
+            base = "Thanks for sharing your sizing experience."
+        elif intent in ("quality_concern", "complaint"):
+            base = "Sorry about your experience."
+        elif intent == "praise":
+            base = "Thanks for the kind words!"
+        tail = " We'll share this with our team. If you need help, please reach us via support."
+        return f"{base} ({sentiment}, {emotion}).{tail}"
+
+    # Try LLM reply
+    reply_text: Optional[str] = None
+    try:
+        if REPLY is not None:
+            reply_text = REPLY.generate_reply(txt)
+    except Exception:
+        reply_text = None
+    if not reply_text:
+        reply_text = _templated_reply(txt, sent, emo, intent)
+
+    return ReviewOut(
+        review=txt,
+        sentiment=sent,
+        emotion=emo,
+        intent=intent,
+        nps=nps,
+        buy_again=buy,
+        reply=reply_text,
     )
 
 @app.get("/health")
