@@ -40,6 +40,7 @@ type AnalyticsData = {
   summary?: SummaryStats; // global summary from backend (full dataset)
   sentimentCounts?: { positive?: number; negative?: number; neutral?: number };
   emotionCounts?: { emotion: string; count: number }[];
+  npsExact?: number; // exact NPS from backend for current filter
 };
 
 export function ClientDashboard() {
@@ -79,9 +80,10 @@ export function ClientDashboard() {
           nps: Number(data.nps ?? 0),
           positiveSentimentPercentage: Number(data.positive_sentiment_pct ?? 0),
         };
-        const sentimentCounts = data.sentiment_counts as AnalyticsData['sentimentCounts'];
-        const emotionCounts = data.emotion_counts as AnalyticsData['emotionCounts'];
-        setData({ analyzedReviews, departmentRatings, summary, sentimentCounts, emotionCounts });
+  const sentimentCounts = data.sentiment_counts as AnalyticsData['sentimentCounts'];
+  const emotionCounts = data.emotion_counts as AnalyticsData['emotionCounts'];
+  const npsExact = typeof data.nps === 'number' ? Number(data.nps) : undefined;
+  setData({ analyzedReviews, departmentRatings, summary, sentimentCounts, emotionCounts, npsExact });
       } catch (err) {
         console.error('Failed to load dashboard data', err);
         setData({ analyzedReviews: [], departmentRatings: [] });
@@ -94,7 +96,11 @@ export function ClientDashboard() {
   }, [selectedDepartment]);
 
   const departments = useMemo(() => {
-    if (!data) return [];
+    if (!data) return ["All"];
+    // Prefer the authoritative list from backend aggregates
+    const fromRatings = (data.departmentRatings || []).map(d => d.department).filter(Boolean);
+    if (fromRatings.length) return ["All", ...fromRatings];
+    // Fallback: derive from sampled reviews (may be incomplete)
     const depts = new Set<string>();
     data.analyzedReviews.forEach(r => depts.add(r.department));
     return ["All", ...Array.from(depts)];
@@ -125,10 +131,13 @@ export function ClientDashboard() {
       const positiveSentimentPercentage = totalFromCounts
         ? (Number(sc?.positive || 0) / totalFromCounts) * 100
         : (filteredData.length ? (filteredData.filter(r => r.sentiment === 'positive').length / filteredData.length) * 100 : 0);
-      // NPS per-department not precomputed; fallback to sample-based
-      const promoters = filteredData.filter(r => getNPSCategory(r.rating) === 'promoter').length;
-      const detractors = filteredData.filter(r => getNPSCategory(r.rating) === 'detractor').length;
-      const nps = filteredData.length > 0 ? ((promoters - detractors) / filteredData.length) * 100 : 0;
+      // NPS per-department: use exact value from backend when provided, else fallback to sample-based
+      let nps = typeof data.npsExact === 'number' ? Number(data.npsExact) : undefined;
+      if (typeof nps !== 'number' || Number.isNaN(nps)) {
+        const promoters = filteredData.filter(r => getNPSCategory(r.rating) === 'promoter').length;
+        const detractors = filteredData.filter(r => getNPSCategory(r.rating) === 'detractor').length;
+        nps = filteredData.length > 0 ? ((promoters - detractors) / filteredData.length) * 100 : 0;
+      }
       return { totalReviews, averageRating, nps, positiveSentimentPercentage } as SummaryStats;
     }
     // Fallback to sample-based when nothing else is available

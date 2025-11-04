@@ -68,7 +68,14 @@ export async function getCsvProductById(id: string): Promise<Product | null> {
           };
         });
 
-        const imageId = imageIds[(di + ci) % imageIds.length];
+        // Prefer a canonical category image id when we recognize the class name; otherwise fallback to rotation
+        const canonical = className.trim();
+        const knownIds = new Set<string>([
+          'Dresses','Knits','Blouses','Sweaters','Pants','Jeans','Fine gauge','Skirts','Jackets','Lounge','Swim','Outerwear','Shorts','Sleep','Legwear','Intimates','Layering','Trend','Casual bottoms','Chemises'
+        ]);
+        const imageId = knownIds.has(canonical)
+          ? canonical
+          : (className.toLowerCase().includes('sleep') ? 'Sleep' : imageIds[(di + ci) % imageIds.length]);
         const product: Product = {
           id: constructedId,
           name: className,

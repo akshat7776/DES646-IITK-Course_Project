@@ -10,13 +10,13 @@ This repository contains a small RAG pipeline that:
 
 Two fast usage modes are available:
 - Native FAISS index (recommended for fast single-run loads): precompute a native `index_native.faiss` and `metadata.json` with `src/precompute_native.py`.
-- Long-lived server mode (recommended for repeated queries): run `src/serve_rag.py` which loads the index once and serves queries via a REST API.
+- Long-lived server mode (recommended for repeated queries): run `src/fastapi_serve.py` which loads the index once and serves queries via a REST API.
 
 Files of interest
 -----------------
 - `src/rag.py` - Main RAG engine (class `RAGbot`). Supports loading LangChain FAISS indexes or a native FAISS binary index.
 - `src/precompute_native.py` - Script to build a native FAISS index (`faiss.write_index`) and aligned `metadata.json` (faster subsequent loads).
-- `src/serve_rag.py` - FastAPI server that loads the index and answers queries (keeps index and LLM in memory).
+- `src/fastapi_serve.py` - FastAPI server that loads the index and answers queries (keeps index and LLM in memory).
 - `scripts/test_rag.py` - Small Python client (uses `requests`) to exercise `/health` and `/query` endpoints.
 - `faiss_index/` - (optional) LangChain FAISS index saved by `RAGbot.save_local()`.
 - `faiss_index_native/` - (optional) Native FAISS index directory produced by `export_native_index` (`index_native.faiss`, `metadata.json`).
@@ -69,9 +69,9 @@ Quick workflows
 2) Long-lived server mode (best for repeated queries)
    - Start the server (loads index once and keeps it in memory):
      ```powershell
-     python .\src\serve_rag.py
+  python .\src\fastapi_serve.py
      # or use uvicorn from repo root
-     uvicorn src.serve_rag:app --host 127.0.0.1 --port 8000
+  uvicorn src.fastapi_serve:app --host 127.0.0.1 --port 8000
      ```
    - Call the server from another terminal:
      ```powershell
@@ -94,7 +94,7 @@ Troubleshooting
 ---------------
 - "7-minute startup": this is usually the cost of deserializing a large FAISS index or computing embeddings. Use the native index path or keep the server running to avoid repeated loads.
 - Missing `GEMINI_API_KEY`: you will get an error when `RAGbot` attempts to initialize the LLM. Set the environment variable and restart.
-- `ModuleNotFoundError: No module named 'src'` when running `uvicorn src.serve_rag:app`: either run `uvicorn` from repo root, or when running `serve_rag.py` directly the script calls `uvicorn.run(app, ...)` (so use `python src/serve_rag.py`).
+- `ModuleNotFoundError: No module named 'src'` when running `uvicorn src.fastapi_serve:app`: either run `uvicorn` from repo root, or run `python src/fastapi_serve.py` which calls `uvicorn.run(app, ...)` directly.
 
 Advanced options
 ----------------
@@ -105,5 +105,5 @@ Advanced options
 If you want, I can:
 - Add a small README section in the project's root `README.md` instead of this file.
 - Make `precompute_native.py` configurable via CLI arguments.
-- Add request timing metrics to `serve_rag.py` and expose a metrics endpoint.
+- Add request timing metrics to `fastapi_serve.py` and expose a metrics endpoint.
 

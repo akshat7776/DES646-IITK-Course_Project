@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#g)"/>
+  <g fill="#0f172a" fill-opacity="0.65">
+    <text x="600" y="400" font-family="Inter, ui-sans-serif, system-ui" font-size="64" font-weight="700" text-anchor="middle">Department</text>
+    <text x="600" y="460" font-family="Inter, ui-sans-serif, system-ui" font-size="24" text-anchor="middle">Add an image in public/images/departments</text>
+  </g>
+</svg>

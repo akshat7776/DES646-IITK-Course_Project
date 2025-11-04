@@ -8,7 +8,7 @@ type ImagePlaceholder = {
 };
 
 const images: ImagePlaceholder[] = placeholderData.placeholderImages;
-const DEFAULT_IMAGE_URL = '/images/placeholders/default.svg';
+const DEFAULT_IMAGE_URL = '/images/departments/default.svg';
 
 function normalizeUnsplash(url: string): string {
   try {

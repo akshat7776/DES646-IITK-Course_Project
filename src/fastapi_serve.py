@@ -24,6 +24,10 @@ NATIVE_PATH = os.path.join(ROOT, "faiss_index_native")
 CHUNK_SIZE = 500
 K = 3
 
+# Cache locations for precomputed dashboard data
+REVIEWS_JSONL = os.path.join(ROOT, "outputs", "dashboard_reviews.jsonl")
+SUMMARY_JSON = os.path.join(ROOT, "outputs", "dashboard_summary.json")
+
 app = FastAPI(title="Feedback Analyzer FastAPI Server")
 
 # CORS (dev-friendly)
@@ -83,16 +87,99 @@ class AnalyzeResponse(BaseModel):
 RAG: RAGbot | None = None
 REPLY: ReplyGenerator | None = None
 DF: pd.DataFrame | None = None
+DFP: pd.DataFrame | None = None  # precomputed reviews: text, rating, department, sentiment, emotion
 
 
 @app.on_event("startup")
 def startup_event():
-    global RAG, REPLY, DF
+    global RAG, REPLY, DF, DFP
     if not os.path.exists(CSV_PATH):
         raise RuntimeError(f"CSV file not found at {CSV_PATH}")
 
     df = pd.read_csv(CSV_PATH)
     DF = df
+
+    # Load or (re)build precomputed dashboard cache
+    def _mtime(path: str) -> float:
+        try:
+            return os.path.getmtime(path)
+        except Exception:
+            return 0.0
+
+    def _load_reviews_cache() -> pd.DataFrame | None:
+        try:
+            if os.path.exists(REVIEWS_JSONL):
+                return pd.read_json(REVIEWS_JSONL, lines=True)
+        except Exception as e:
+            print(f"Failed to load {REVIEWS_JSONL}: {e}")
+        return None
+
+    def _compute_and_store_cache() -> pd.DataFrame:
+        print("[cache] Computing dashboard reviews (sentiment/emotion) once...")
+        cols = [c for c in ["Review Text", "Rating", "Department Name"] if c in df.columns]
+        d = df[cols].copy().reset_index(drop=True)
+        d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce").fillna(0).astype(float)
+        d.loc[:, "Review Text"] = d["Review Text"].fillna("")
+        d.loc[:, "Department Name"] = d["Department Name"].fillna("Unknown")
+
+        s_scores = d["Review Text"].astype(str).apply(vader_sentiment_score)
+        s_labels = s_scores.apply(vader_sentiment_label)
+        if _HAS_EMOTIONS and len(d):
+            try:
+                emos = cluster_emotions(d["Review Text"].astype(str).tolist())
+            except Exception:
+                emos = ["neutral"] * len(d)
+        else:
+            emos = ["neutral"] * len(d)
+
+        dfp = pd.DataFrame({
+            "text": d["Review Text"].astype(str),
+            "rating": d["Rating"].astype(float),
+            "department": d["Department Name"].astype(str),
+            "sentiment": s_labels.astype(str),
+            "emotion": emos,
+        })
+
+        os.makedirs(os.path.dirname(REVIEWS_JSONL), exist_ok=True)
+        try:
+            import json as _json
+            with open(REVIEWS_JSONL, "w", encoding="utf-8") as f:
+                for rec in dfp.to_dict(orient="records"):
+                    f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"Warning: failed to write {REVIEWS_JSONL}: {e}")
+
+        try:
+            total_reviews = int(len(dfp))
+            avg_rating = float(dfp["rating"].mean()) if total_reviews else 0.0
+            promoters = int((dfp["rating"] >= 4).sum())
+            detractors = int((dfp["rating"] <= 2).sum())
+            nps = ((promoters - detractors) / total_reviews) * 100 if total_reviews else 0.0
+            positive_pct = float((dfp["sentiment"] == "positive").sum()) / total_reviews * 100 if total_reviews else 0.0
+            dept_avg = (
+                dfp.groupby("department")["rating"].mean().reset_index().rename(columns={"department": "department", "rating": "averageRating"})
+                if total_reviews else pd.DataFrame(columns=["department", "averageRating"])
+            )
+            department_ratings = [
+                {"department": str(r["department"]), "averageRating": float(r["averageRating"])}
+                for _, r in dept_avg.iterrows()
+            ]
+            import json as _json
+            with open(SUMMARY_JSON, "w", encoding="utf-8") as f:
+                _json.dump({
+                    "total_reviews": total_reviews,
+                    "average_rating": avg_rating,
+                    "nps": nps,
+                    "positive_sentiment_pct": positive_pct,
+                    "department_ratings": department_ratings,
+                }, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Warning: failed to write {SUMMARY_JSON}: {e}")
+
+        return dfp
+
+    use_cache = os.path.exists(REVIEWS_JSONL) and (_mtime(REVIEWS_JSONL) >= _mtime(CSV_PATH))
+    DFP = _load_reviews_cache() if use_cache else _compute_and_store_cache()
 
     print("Starting RAG server - initializing RAGbot (once on startup)")
     RAG = RAGbot(df, k=K, persist_path=PERSIST_PATH, chunk_size=CHUNK_SIZE, force_rebuild=False)
@@ -106,11 +193,16 @@ def startup_event():
         print(f"ReplyGenerator init failed: {e}")
 
 
-def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dict[str, Any]:
+def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000, department: Optional[str] = None) -> Dict[str, Any]:
     cols = [c for c in ["Review Text", "Rating", "Department Name"] if c in df.columns]
-    d = df[cols].copy().reset_index(drop=True)
+    base = df[cols]
+    if department and "Department Name" in base.columns:
+        mask = base["Department Name"].astype(str) == str(department)
+        d = base.loc[mask].copy().reset_index(drop=True)
+    else:
+        d = base.copy().reset_index(drop=True)
     d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce").fillna(0).astype(float)
-    d["Review Text"].fillna("", inplace=True)
+    d.loc[:, "Review Text"] = d["Review Text"].fillna("")
 
     total_reviews = int(len(d))
     average_rating = float(d["Rating"].mean()) if total_reviews else 0.0
@@ -119,21 +211,44 @@ def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dic
     detractors = int((d["Rating"] <= 2).sum())
     nps = ((promoters - detractors) / total_reviews) * 100 if total_reviews else 0.0
 
-    try:
-        s_scores = d["Review Text"].astype(str).apply(vader_sentiment_score)
-        s_labels = s_scores.apply(vader_sentiment_label)
-    except Exception:
-        s_labels = pd.Series(["neutral"] * total_reviews, index=d.index)
-
-    positive_pct = float((s_labels == "positive").sum()) / total_reviews * 100 if total_reviews else 0.0
-
-    if _HAS_EMOTIONS and total_reviews:
+    # Aggregated signals from precomputed DFP for accuracy
+    global DFP
+    sentiment_counts: Dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
+    emotion_counts_list: List[Dict[str, Any]] = []
+    if DFP is not None:
+        dfp = DFP
+        if department:
+            dfp = dfp[dfp["department"].astype(str) == str(department)]
+        # Sentiment counts
         try:
-            emos = cluster_emotions(d["Review Text"].astype(str).tolist())
+            vc = dfp["sentiment"].value_counts()
+            for k in ["positive", "neutral", "negative"]:
+                sentiment_counts[k] = int(vc.get(k, 0))
         except Exception:
-            emos = ["neutral"] * total_reviews
+            pass
+        # Emotion counts (top 10)
+        try:
+            evc = dfp["emotion"].value_counts().head(10)
+            emotion_counts_list = [{"emotion": str(idx), "count": int(val)} for idx, val in evc.items()]
+        except Exception:
+            emotion_counts_list = []
+        # Exact NPS from precomputed ratings for the (sub)set
+        try:
+            total_prec = int(len(dfp))
+            if total_prec:
+                prom = int((dfp["rating"] >= 4).sum())
+                det = int((dfp["rating"] <= 2).sum())
+                nps = ((prom - det) / total_prec) * 100.0
+                # Override average rating with precise per-filter value for consistency
+                average_rating = float(dfp["rating"].mean())
+        except Exception:
+            pass
+    # positive percentage uses aggregated counts if available
+    total_for_pct = sum(sentiment_counts.values())
+    if total_for_pct > 0:
+        positive_pct = (sentiment_counts["positive"] / total_for_pct) * 100.0
     else:
-        emos = ["neutral"] * total_reviews
+        positive_pct = 0.0
 
     dept_avg = (
         d.groupby("Department Name")["Rating"].mean().reset_index().rename(columns={"Department Name": "department", "Rating": "averageRating"})
@@ -153,7 +268,22 @@ def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dic
 
     reviews: list[dict[str, Any]] = []
     if sample_indices:
-        for idx in sample_indices:
+        # Compute signals for sampled reviews only (keep payload light)
+        texts = [str(d.iloc[idx].get("Review Text", "")) for idx in sample_indices]
+        try:
+            s_scores_sample = pd.Series(texts).apply(vader_sentiment_score)
+            s_labels_sample = s_scores_sample.apply(vader_sentiment_label)
+        except Exception:
+            s_labels_sample = pd.Series(["neutral"] * len(texts))
+        if _HAS_EMOTIONS and len(texts):
+            try:
+                emos_sample = cluster_emotions(texts)
+            except Exception:
+                emos_sample = ["neutral"] * len(texts)
+        else:
+            emos_sample = ["neutral"] * len(texts)
+
+        for pos, idx in enumerate(sample_indices):
             try:
                 row = d.iloc[idx]
                 review_text = str(row.get("Review Text", ""))
@@ -163,9 +293,8 @@ def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dic
                 review_text = ""
                 rating_val = 0.0
                 dept_val = "Unknown"
-
-            sent = str(s_labels.iloc[idx]) if total_reviews else "neutral"
-            emo = emos[idx] if idx < len(emos) else "neutral"
+            sent = str(s_labels_sample.iloc[pos]) if len(texts) else "neutral"
+            emo = emos_sample[pos] if pos < len(emos_sample) else "neutral"
 
             reviews.append({
                 "text": review_text,
@@ -183,19 +312,92 @@ def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dic
         "department_ratings": department_ratings,
         "reviews": reviews,
         "sample_size": len(reviews),
+        "sentiment_counts": sentiment_counts,
+        "emotion_counts": emotion_counts_list,
     }
 
 
 @app.get("/dashboard_data")
-def dashboard_data(max_items: int = Query(1000, ge=0, le=10000)):
+def dashboard_data(max_items: int = Query(1000, ge=0, le=10000), department: Optional[str] = Query(None)):
     global DF
     if DF is None:
         raise HTTPException(status_code=503, detail="Dataframe not loaded")
     try:
-        data = _compute_dashboard_from_df(DF, max_reviews=int(max_items))
+        data = _compute_dashboard_from_df(DF, max_reviews=int(max_items), department=department)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"dashboard_data failed: {e}")
+
+
+@app.post("/refresh_dashboard")
+def refresh_dashboard():
+    """Force recomputation of dashboard cache from the CSV.
+
+    This runs once and overwrites outputs/dashboard_reviews.jsonl and dashboard_summary.json.
+    """
+    global DF, DFP
+    if DF is None:
+        raise HTTPException(status_code=503, detail="Dataframe not loaded")
+    # Reuse the startup helper by inlining minimal logic
+    try:
+        # Recompute using current DF and write cache
+        cols = [c for c in ["Review Text", "Rating", "Department Name"] if c in DF.columns]
+        d = DF[cols].copy().reset_index(drop=True)
+        d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce").fillna(0).astype(float)
+        d.loc[:, "Review Text"] = d["Review Text"].fillna("")
+        d.loc[:, "Department Name"] = d["Department Name"].fillna("Unknown")
+
+        s_scores = d["Review Text"].astype(str).apply(vader_sentiment_score)
+        s_labels = s_scores.apply(vader_sentiment_label)
+        if _HAS_EMOTIONS and len(d):
+            try:
+                emos = cluster_emotions(d["Review Text"].astype(str).tolist())
+            except Exception:
+                emos = ["neutral"] * len(d)
+        else:
+            emos = ["neutral"] * len(d)
+
+        DFP = pd.DataFrame({
+            "text": d["Review Text"].astype(str),
+            "rating": d["Rating"].astype(float),
+            "department": d["Department Name"].astype(str),
+            "sentiment": s_labels.astype(str),
+            "emotion": emos,
+        })
+
+        import json as _json
+        os.makedirs(os.path.dirname(REVIEWS_JSONL), exist_ok=True)
+        with open(REVIEWS_JSONL, "w", encoding="utf-8") as f:
+            for rec in DFP.to_dict(orient="records"):
+                f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+
+        total_reviews = int(len(DFP))
+        avg_rating = float(DFP["rating"].mean()) if total_reviews else 0.0
+        promoters = int((DFP["rating"] >= 4).sum())
+        detractors = int((DFP["rating"] <= 2).sum())
+        nps = ((promoters - detractors) / total_reviews) * 100 if total_reviews else 0.0
+        positive_pct = float((DFP["sentiment"] == "positive").sum()) / total_reviews * 100 if total_reviews else 0.0
+        dept_avg = (
+            DFP.groupby("department")["rating"].mean().reset_index().rename(columns={"department": "department", "rating": "averageRating"})
+            if total_reviews else pd.DataFrame(columns=["department", "averageRating"])
+        )
+        department_ratings = [
+            {"department": str(r["department"]), "averageRating": float(r["averageRating"])}
+            for _, r in dept_avg.iterrows()
+        ]
+
+        with open(SUMMARY_JSON, "w", encoding="utf-8") as f:
+            _json.dump({
+                "total_reviews": total_reviews,
+                "average_rating": avg_rating,
+                "nps": nps,
+                "positive_sentiment_pct": positive_pct,
+                "department_ratings": department_ratings,
+            }, f, ensure_ascii=False, indent=2)
+
+        return {"ok": True, "total_reviews": total_reviews}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"refresh_dashboard failed: {e}")
 
 
 @app.post("/query", response_model=QueryResponse)

@@ -1,0 +1,30 @@
+# Core server
+fastapi>=0.115.0,<0.116
+uvicorn[standard]>=0.30.0,<0.31
+pydantic>=2.7,<3
+python-dotenv>=1.0,<2
+
+# Data & ML stack
+pandas>=2.2,<3
+scikit-learn>=1.3,<2
+numpy>=1.26,<3
+scipy>=1.11,<2
+nltk>=3.8,<4
+sentence-transformers>=2.7,<3
+faiss-cpu>=1.7.4,<2
+requests>=2.31,<3
+huggingface-hub>=0.20,<1
+accelerate>=0.33,<1
+
+# LangChain ecosystem
+langchain-core>=0.3,<0.4
+langchain-text-splitters>=0.3,<0.4
+langchain-community>=0.3,<0.4
+langchain-huggingface>=0.1,<0.2
+langchain-google-genai>=2.0,<3
+
+# Google Gemini (used directly in orchestrator)
+google-generativeai>=0.7,<1
+
+# Optional but recommended (used when available by rag.py)
+langgraph>=0.2,<0.3

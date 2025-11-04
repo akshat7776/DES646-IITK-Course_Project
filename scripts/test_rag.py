@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""Simple Python test client for the local RAG server.
-
-Usage:
-  python scripts/test_rag.py --query "Which item fits worst?" --count 3 --delay 1
-
-Requires: requests (pip install requests)
-"""
 import argparse
 import time
 import requests
@@ -69,18 +61,18 @@ def pretty_print(obj):
 def main():
     args = parse_args()
 
-    # # Health check
-    # try:
-    #     h = requests.get(HEALTH_URL, timeout=5)
-    #     print("Health:", h.status_code, end=" - ")
-    #     try:
-    #         pretty_print(h.json())
-    #     except Exception:
-    #         print(h.text)
-    # except Exception as e:
-    #     print("Health check failed:", e)
-    #     print("Make sure the server is running (python src/serve_rag.py)")
-    #     sys.exit(1)
+    # Health check
+    try:
+        h = requests.get(HEALTH_URL, timeout=5)
+        print("Health:", h.status_code, end=" - ")
+        try:
+            pretty_print(h.json())
+        except Exception:
+            print(h.text)
+    except Exception as e:
+        print("Health check failed:", e)
+        print("Make sure the server is running (python src/fastapi_serve.py)")
+        sys.exit(1)
 
     # Run queries
     for i in range(1, args.count + 1):

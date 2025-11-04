@@ -79,9 +79,12 @@ export default function DepartmentBrowser() {
           };
         });
 
-  // Use custom image for Sleep classes; otherwise rotate through placeholders
-  const isSleep = className.toLowerCase().includes("sleep");
-  const imageId = isSleep ? "sleep" : imageIds[(di + ci) % imageIds.length];
+        // Map class name to a specific placeholder id when available; fallback to rotation
+        const canonical = className.trim();
+        const knownIds = new Set<string>([
+          "Dresses","Knits","Blouses","Sweaters","Pants","Jeans","Fine gauge","Skirts","Jackets","Lounge","Swim","Outerwear","Shorts","Sleep","Legwear","Intimates","Layering","Trend","Casual bottoms","Chemises"
+        ]);
+        const imageId = knownIds.has(canonical) ? canonical : (className.toLowerCase().includes("sleep") ? "Sleep" : imageIds[(di + ci) % imageIds.length]);
         const product: Product = {
           id: `${slugify(deptName)}-${slugify(className)}`,
           name: className,
@@ -93,18 +96,39 @@ export default function DepartmentBrowser() {
         products.push(product);
       });
 
-      // Simple image hint per department using the first product image or generic
+      // Department cover images under public/images/departments
+      // Drop SVG placeholders into that folder (intimate.svg, dresses.svg, bottoms.svg, tops.svg, jackets.svg, trend.svg, lounge.svg, default.svg)
       const imageUrlHints: Record<string, { imageUrl: string; imageHint: string }> = {
         Intimate: {
-          imageUrl: "/images/departments/intimate.jpg",
+          imageUrl: "/images/departments/intimate.svg",
           imageHint: "sleepwear, intimates",
         },
+        Dresses: {
+          imageUrl: "/images/departments/dresses.jpg",
+          imageHint: "dresses rack, apparel",
+        },
+        Bottoms: {
+          imageUrl: "/images/departments/bottoms.jpg",
+          imageHint: "pants, jeans, skirts",
+        },
+        Tops: {
+          imageUrl: "/images/departments/tops.jpg",
+          imageHint: "blouses, tees, shirts",
+        },
+        Jackets: {
+          imageUrl: "/images/departments/jackets.jpg",
+          imageHint: "jackets, outerwear",
+        },
+        Trend: {
+          imageUrl: "/images/departments/default.svg",
+          imageHint: "trendy apparel",
+        },
         Lounge: {
-          imageUrl: "/images/departments/lounge.jpg",
+          imageUrl: "/images/departments/tops.jpg",
           imageHint: "loungewear, cozy",
         },
         default: {
-          imageUrl: "/images/departments/default.jpg",
+          imageUrl: "/images/departments/default.svg",
           imageHint: "fashion department",
         },
       };
