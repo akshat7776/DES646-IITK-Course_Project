@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, Optional
 try:
-	from dotenv import load_dotenv  # type: ignore
+	from dotenv import load_dotenv  
 	load_dotenv()
 except Exception:
 	pass
@@ -14,14 +14,13 @@ except Exception:
 import numpy as np
 import pandas as pd
 
-# Local modules (work both as package and as standalone script directory)
+# Local modules 
 try:
-	# When executed as a package (e.g., python -m src.orchestrator)
 	from . import sentiment as sentiment_mod  # type: ignore
 	from . import emotions as emotions_mod  # type: ignore
 	from . import intent as intents_mod  # type: ignore
 except Exception:
-	# When imported from a sibling (e.g., serve_rag.py in same folder)
+	# When imported from a sibling (e.g., fastapi_serve.py in same folder)
 	import sys as _sys, os as _os
 	_sys.path.append(_os.path.dirname(__file__))
 	import sentiment as sentiment_mod  # type: ignore
@@ -231,7 +230,7 @@ def analyze_text(text: str) -> OrchestratedResult:
 
 
 
-# --- CLI ---------------------------------------------------------------------
+# CLI 
 def _build_arg_parser() -> argparse.ArgumentParser:
 	p = argparse.ArgumentParser(description="Gemini-backed feedback orchestrator (single text)")
 	p.add_argument("--text", required=True, help="Feedback text to analyze")

@@ -88,9 +88,7 @@ def cluster_emotions(
 
 
 if __name__ == "__main__":
-	# If run directly, cluster a small set of feedbacks below.
 	feedback = [
-		# Add your feedback strings here:
 		"This shirt is very flattering to all due to the adjustable front tie. it is the perfect length to wear with leggings and it is sleeveless so it pairs well with any cardigan. love this shirt!!!"
 	]
 	preds = cluster_emotions(feedback, k=7)

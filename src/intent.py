@@ -97,7 +97,6 @@ def cluster_intents(
 
 
 if __name__ == "__main__":
-    # Minimal demo: add your feedback strings here
     feedback = [
         "This shirt is very flattering to all due to the adjustable front tie. it is the perfect length to wear with leggings and it is sleeveless so it pairs well with any cardigan. love this shirt!!!"
     ]

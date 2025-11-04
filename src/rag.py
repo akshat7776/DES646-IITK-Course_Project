@@ -28,15 +28,7 @@ except Exception:
 
 class RAGbot:
     def __init__(self, df: pd.DataFrame, review_col: Optional[str] = None, k: int = 5, persist_path: Optional[str] = "faiss_index", chunk_size: int = 500, force_rebuild: bool = False):
-        """RAG engine with optional FAISS persistence and small performance improvements.
 
-        Args:
-            df: DataFrame with reviews.
-            review_col: optional name of review text column; auto-detected if None.
-            k: number of docs to retrieve.
-            persist_path: directory path to save/load FAISS index (fast startup when present).
-            chunk_size: base chunk size for text splitter.
-        """
         self.df = df
         self.review_col = review_col or self._detect_review_column()
         self.k = k
@@ -50,9 +42,7 @@ class RAGbot:
         self.chunks: Optional[List[Document]] = None
         self.retriever = None
 
-        # If a persisted FAISS index exists and the user did not request a rebuild,
-        # load it directly (fast) and avoid creating chunks/embeddings on init.
-        # also prefer native faiss files if present for faster load
+        # If a persisted FAISS index exists and the user did not request a rebuild
         self.native_dir = f"{self.persist_path}_native" if self.persist_path else None
         if self.native_dir and os.path.exists(self.native_dir) and not force_rebuild and _HAS_FAISS:
             print(f"Found persisted NATIVE FAISS index at {self.native_dir}, loading (very fast)...")
@@ -62,11 +52,11 @@ class RAGbot:
         elif self.persist_path and os.path.exists(self.persist_path) and not force_rebuild:
             print(f"Found persisted FAISS index at {self.persist_path}, loading (fast)...")
             t0 = time.perf_counter()
-            # _create_vectorstore will detect the persisted index and load it.
+            # create_vectorstore will detect the persisted index and load it.
             self.vectorstore = self._create_vectorstore()
             print(f"Loaded FAISS index in {time.perf_counter() - t0:.2f}s")
         else:
-            # build chunks and vectorstore (costly on first run)
+            # build chunks and vectorstore 
             print("No persisted index found or rebuild requested — creating chunks and building FAISS (this can take several minutes)")
             t1 = time.perf_counter()
             self.chunks = self._create_chunks()
@@ -150,13 +140,9 @@ class RAGbot:
                 pass
         return vs
 
-    # --- Native FAISS export / load helpers (faster single-run startup) ---
+    # Native FAISS export / load helpers 
     def export_native_index(self, native_dir: str) -> None:
-        """Export a native faiss index and metadata to `native_dir`.
-
-        This writes the faiss binary (fast to read with faiss.read_index) and
-        a metadata JSON file with the chunk texts and their metadata.
-        """
+        
         if not _HAS_FAISS:
             raise RuntimeError("faiss python package is required to export native index")
 

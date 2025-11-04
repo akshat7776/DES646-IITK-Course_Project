@@ -1,15 +1,20 @@
 import os
 import pandas as pd
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-# Import your RAG implementation
 from rag import RAGbot
-from orchestrator import analyze_text  # single-feedback analyzer (sentiment/emotion/intent + Gemini)
+from orchestrator import analyze_text 
 from reply import ReplyGenerator
+from sentiment import vader_sentiment_score, vader_sentiment_label
+try:
+    from emotions import cluster_emotions  # optional; heavy on first run
+    _HAS_EMOTIONS = True
+except Exception:
+    _HAS_EMOTIONS = False
 
 # Configuration - adjust paths if needed
 ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -19,9 +24,9 @@ NATIVE_PATH = os.path.join(ROOT, "faiss_index_native")
 CHUNK_SIZE = 500
 K = 3
 
-app = FastAPI(title="RAG Server - keeps FAISS & LLM in memory")
+app = FastAPI(title="Feedback Analyzer FastAPI Server")
 
-# CORS for extension & local site (dev-friendly: allow all)
+# CORS (dev-friendly)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,8 +35,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class QueryRequest(BaseModel):
     query: str
+
 
 class QueryResponse(BaseModel):
     answer: str
@@ -39,7 +46,6 @@ class QueryResponse(BaseModel):
     include_sources: bool
 
 
-# ----- Reviews analyze endpoint models ---------------------------------------
 class ReviewIn(BaseModel):
     text: str
     rating: Optional[float] = None
@@ -73,31 +79,124 @@ class AnalyzeResponse(BaseModel):
     dominant_sentiment: str
     summary: str
 
-# Global RAG instance
+
 RAG: RAGbot | None = None
 REPLY: ReplyGenerator | None = None
+DF: pd.DataFrame | None = None
+
 
 @app.on_event("startup")
 def startup_event():
-    global RAG, REPLY
-    # Load dataframe once (if you have a different location, change CSV_PATH)
+    global RAG, REPLY, DF
     if not os.path.exists(CSV_PATH):
         raise RuntimeError(f"CSV file not found at {CSV_PATH}")
 
     df = pd.read_csv(CSV_PATH)
+    DF = df
 
-    # Initialize RAGbot: prefer native index if present
-    print("Starting RAG server - initializing RAGbot (this happens once on startup)")
+    print("Starting RAG server - initializing RAGbot (once on startup)")
     RAG = RAGbot(df, k=K, persist_path=PERSIST_PATH, chunk_size=CHUNK_SIZE, force_rebuild=False)
     print("RAG server ready: index loaded and models initialized")
 
-    # Initialize ReplyGenerator (optional; fall back if not available)
     try:
         REPLY = ReplyGenerator()
         print("ReplyGenerator ready")
     except Exception as e:
         REPLY = None
         print(f"ReplyGenerator init failed: {e}")
+
+
+def _compute_dashboard_from_df(df: pd.DataFrame, max_reviews: int = 1000) -> Dict[str, Any]:
+    cols = [c for c in ["Review Text", "Rating", "Department Name"] if c in df.columns]
+    d = df[cols].copy().reset_index(drop=True)
+    d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce").fillna(0).astype(float)
+    d["Review Text"].fillna("", inplace=True)
+
+    total_reviews = int(len(d))
+    average_rating = float(d["Rating"].mean()) if total_reviews else 0.0
+
+    promoters = int((d["Rating"] >= 4).sum())
+    detractors = int((d["Rating"] <= 2).sum())
+    nps = ((promoters - detractors) / total_reviews) * 100 if total_reviews else 0.0
+
+    try:
+        s_scores = d["Review Text"].astype(str).apply(vader_sentiment_score)
+        s_labels = s_scores.apply(vader_sentiment_label)
+    except Exception:
+        s_labels = pd.Series(["neutral"] * total_reviews, index=d.index)
+
+    positive_pct = float((s_labels == "positive").sum()) / total_reviews * 100 if total_reviews else 0.0
+
+    if _HAS_EMOTIONS and total_reviews:
+        try:
+            emos = cluster_emotions(d["Review Text"].astype(str).tolist())
+        except Exception:
+            emos = ["neutral"] * total_reviews
+    else:
+        emos = ["neutral"] * total_reviews
+
+    dept_avg = (
+        d.groupby("Department Name")["Rating"].mean().reset_index().rename(columns={"Department Name": "department", "Rating": "averageRating"})
+        if "Department Name" in d.columns and total_reviews else pd.DataFrame(columns=["department", "averageRating"]) 
+    )
+    department_ratings = [
+        {"department": str(row["department"]), "averageRating": float(row["averageRating"]) }
+        for _, row in dept_avg.iterrows()
+    ]
+
+    max_reviews = int(max(0, max_reviews)) or 0
+    return_count = min(total_reviews, max_reviews if max_reviews > 0 else min(total_reviews, 1000))
+    sample_indices: List[int] = []
+    if total_reviews and return_count:
+        import numpy as _np
+        sample_indices = list(_np.linspace(0, total_reviews - 1, num=return_count, dtype=int))
+
+    reviews: list[dict[str, Any]] = []
+    if sample_indices:
+        for idx in sample_indices:
+            try:
+                row = d.iloc[idx]
+                review_text = str(row.get("Review Text", ""))
+                rating_val = float(row.get("Rating", 0.0))
+                dept_val = str(row.get("Department Name", "Unknown"))
+            except Exception:
+                review_text = ""
+                rating_val = 0.0
+                dept_val = "Unknown"
+
+            sent = str(s_labels.iloc[idx]) if total_reviews else "neutral"
+            emo = emos[idx] if idx < len(emos) else "neutral"
+
+            reviews.append({
+                "text": review_text,
+                "rating": rating_val,
+                "department": dept_val,
+                "sentiment": sent,
+                "emotion": emo,
+            })
+
+    return {
+        "total_reviews": total_reviews,
+        "average_rating": average_rating,
+        "nps": nps,
+        "positive_sentiment_pct": positive_pct,
+        "department_ratings": department_ratings,
+        "reviews": reviews,
+        "sample_size": len(reviews),
+    }
+
+
+@app.get("/dashboard_data")
+def dashboard_data(max_items: int = Query(1000, ge=0, le=10000)):
+    global DF
+    if DF is None:
+        raise HTTPException(status_code=503, detail="Dataframe not loaded")
+    try:
+        data = _compute_dashboard_from_df(DF, max_reviews=int(max_items))
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"dashboard_data failed: {e}")
+
 
 @app.post("/query", response_model=QueryResponse)
 def query_endpoint(req: QueryRequest):
@@ -124,7 +223,6 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
         try:
             res = analyze_text(txt)
         except Exception as e:
-            # If orchestrator fails entirely, return a basic error mapping for that review
             raise HTTPException(status_code=500, detail=f"orchestrator error: {e}")
 
         sent = res.signals.sentiment_label
@@ -133,7 +231,6 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
         nps = float(res.prediction.nps_score)
         buy = "Yes" if res.prediction.repeat_purchase else "No"
 
-        # Reply generation: prefer LLM ReplyGenerator, fall back to a template
         def _templated_reply(text: str, sentiment: str, emotion: str, intent: str) -> str:
             base = "Thanks for your feedback."
             if intent == "size_issue":
@@ -149,7 +246,7 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
         try:
             if REPLY is not None:
                 reply_text = REPLY.generate_reply(txt)
-        except Exception as _:
+        except Exception:
             reply_text = None
         if not reply_text:
             reply_text = _templated_reply(txt, sent, emo, intent)
@@ -169,16 +266,12 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
     if not items:
         raise HTTPException(status_code=400, detail="no valid reviews after filtering")
 
-    # Aggregates
     avg_nps = float(sum(nps_values) / max(len(nps_values), 1)) if nps_values else None
     ratings = [float(r.rating) for r in req.reviews if r.rating is not None]
     avg_rating = float(sum(ratings) / len(ratings)) if ratings else None
-    # Dominant sentiment by frequency
     dom_sent = max(set(sentiments), key=sentiments.count) if sentiments else "neutral"
 
-    # Simple heuristic summary
-    # You can replace with a call to a summarizer if desired.
-    top_intents = {}
+    top_intents: Dict[str, int] = {}
     for it in [it.intent for it in items]:
         top_intents[it] = top_intents.get(it, 0) + 1
     top_intent = max(top_intents.items(), key=lambda kv: kv[1])[0] if top_intents else "other"
@@ -202,7 +295,6 @@ def analyze_reviews_endpoint(req: AnalyzeRequest):
     )
 
 
-# ---- Single review analysis (for inline per-review action) ------------------
 class SingleAnalyzeRequest(BaseModel):
     text: str
     rating: Optional[float] = None
@@ -226,7 +318,6 @@ def analyze_review_endpoint(req: SingleAnalyzeRequest):
     nps = float(res.prediction.nps_score)
     buy = "Yes" if res.prediction.repeat_purchase else "No"
 
-    # Reply via ReplyGenerator if available; fallback template otherwise
     def _templated_reply(text: str, sentiment: str, emotion: str, intent: str) -> str:
         base = "Thanks for your feedback."
         if intent == "size_issue":
@@ -238,7 +329,6 @@ def analyze_review_endpoint(req: SingleAnalyzeRequest):
         tail = " We'll share this with our team. If you need help, please reach us via support."
         return f"{base} ({sentiment}, {emotion}).{tail}"
 
-    # Try LLM reply
     reply_text: Optional[str] = None
     try:
         if REPLY is not None:
@@ -258,11 +348,11 @@ def analyze_review_endpoint(req: SingleAnalyzeRequest):
         reply=reply_text,
     )
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "ready": RAG is not None}
 
+
 if __name__ == "__main__":
-    # Run the server with a single worker so the index stays in memory
-    # When running the script directly, pass the app object instead of the module path
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

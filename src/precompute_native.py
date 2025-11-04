@@ -3,7 +3,6 @@ import pandas as pd
 from rag import RAGbot
 
 if __name__ == "__main__":
-    # Adjust paths as needed
     csv_path = r"D:\DES646-Project\outputs\clean_csv.csv"
     native_dir = r"D:\DES646-Project\faiss_index_native"
 
