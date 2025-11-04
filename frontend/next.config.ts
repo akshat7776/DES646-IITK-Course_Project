@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    // Allow common image CDNs used across the app
+    domains: [
+      'placehold.co',
+      'images.unsplash.com',
+      'source.unsplash.com',
+      'unsplash.com',
+      'picsum.photos',
+    ],
     remotePatterns: [
       {
         protocol: 'https',
@@ -18,7 +26,19 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'source.unsplash.com',
         port: '',
         pathname: '/**',
       },

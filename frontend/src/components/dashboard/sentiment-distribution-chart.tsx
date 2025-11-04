@@ -17,24 +17,37 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart"
 
-type SentimentDistributionChartProps = {
-  data: {
-    sentiment: 'positive' | 'negative' | 'neutral'
-  }[]
+type SentimentCounts = {
+  positive?: number
+  negative?: number
+  neutral?: number
 }
 
-export function SentimentDistributionChart({ data }: SentimentDistributionChartProps) {
+type SentimentDistributionChartProps = {
+  data?: {
+    sentiment: 'positive' | 'negative' | 'neutral'
+  }[]
+  counts?: SentimentCounts
+}
+
+export function SentimentDistributionChart({ data = [], counts }: SentimentDistributionChartProps) {
   const sentimentCounts = useMemo(() => {
-    const counts = { positive: 0, negative: 0, neutral: 0 }
-    data.forEach(review => {
-      counts[review.sentiment]++
-    })
+    const base = { positive: 0, negative: 0, neutral: 0 }
+    if (counts) {
+      base.positive = Number(counts.positive || 0)
+      base.negative = Number(counts.negative || 0)
+      base.neutral = Number(counts.neutral || 0)
+    } else {
+      data.forEach(review => {
+        base[review.sentiment]++
+      })
+    }
     return [
-      { sentiment: 'positive', count: counts.positive, fill: 'hsl(var(--chart-2))' },
-      { sentiment: 'negative', count: counts.negative, fill: 'hsl(var(--destructive))' },
-      { sentiment: 'neutral', count: counts.neutral, fill: 'hsl(var(--muted-foreground))' },
+      { sentiment: 'positive', count: base.positive, fill: 'hsl(var(--chart-2))' },
+      { sentiment: 'negative', count: base.negative, fill: 'hsl(var(--destructive))' },
+      { sentiment: 'neutral', count: base.neutral, fill: 'hsl(var(--muted-foreground))' },
     ].filter(item => item.count > 0)
-  }, [data])
+  }, [data, counts])
 
   const chartConfig = useMemo(() => {
     const config: any = {};

@@ -24,24 +24,36 @@ export type RAGOutput = {
 };
 
 export async function analyzeFeedbackWithRAG(input: RAGInput): Promise<RAGOutput> {
-  const baseUrl = process.env.NEXT_PUBLIC_RAG_API_BASE?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
-  const res = await fetch(`${baseUrl}/query`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: input.query }),
-    // Always use fetch from the browser or server with CORS enabled in FastAPI
-    cache: 'no-store',
-  });
+  // Use same-origin proxy route so the browser won't hit CORS issues.
+  // The proxy will forward to the configured backend (RAG_API_BASE).
+  const proxyPath = '/api/rag';
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`RAG API error ${res.status}: ${text || res.statusText}`);
+  try {
+    const res = await fetch(proxyPath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: input.query }),
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`RAG API (proxy) error ${res.status}: ${text || res.statusText}`);
+    }
+
+    const data = (await res.json()) as { answer: string; sources?: RAGSource[]; include_sources?: boolean };
+    return {
+      answer: data.answer ?? '',
+      sources: data.sources ?? [],
+      include_sources: data.include_sources ?? false,
+    };
+  } catch (err: any) {
+    // Helpful error message for devs — often this is CORS or backend not running.
+    console.error('Failed to call RAG proxy:', err);
+    throw new Error(
+      `Failed to call RAG service. Ensure the Python backend is running and RAG_API_BASE/NEXT_PUBLIC_RAG_API_BASE is set. Details: ${String(
+        err?.message || err
+      )}`
+    );
   }
-
-  const data = (await res.json()) as { answer: string; sources?: RAGSource[]; include_sources?: boolean };
-  return {
-    answer: data.answer ?? '',
-    sources: data.sources ?? [],
-    include_sources: data.include_sources ?? false,
-  };
 }

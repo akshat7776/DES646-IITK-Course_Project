@@ -1,6 +1,6 @@
 # Feedback Analyzer Frontend
 
-This Next.js app now connects to the Python FastAPI RAG backend exposed by `src/serve_rag.py`.
+This Next.js app now connects to the Python FastAPI RAG backend exposed by `src/fastapi_serve.py`.
 
 ## RAG integration
 
@@ -20,7 +20,7 @@ If not set, the app defaults to `http://127.0.0.1:8000`.
 ## Run
 
 1. Start the FastAPI server (from repo root):
-	- Ensure the CSV and FAISS index exist as configured in `src/serve_rag.py`.
+	- Ensure the CSV and FAISS index exist as configured in `src/fastapi_serve.py`.
 	- Run the server and wait for "RAG server ready".
 2. Start the Next.js dev server (this folder):
 	- Install deps and run `pnpm dev`/`npm run dev`.

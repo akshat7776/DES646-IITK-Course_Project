@@ -79,7 +79,9 @@ export default function DepartmentBrowser() {
           };
         });
 
-        const imageId = imageIds[(di + ci) % imageIds.length];
+  // Use custom image for Sleep classes; otherwise rotate through placeholders
+  const isSleep = className.toLowerCase().includes("sleep");
+  const imageId = isSleep ? "sleep" : imageIds[(di + ci) % imageIds.length];
         const product: Product = {
           id: `${slugify(deptName)}-${slugify(className)}`,
           name: className,
@@ -93,17 +95,26 @@ export default function DepartmentBrowser() {
 
       // Simple image hint per department using the first product image or generic
       const imageUrlHints: Record<string, { imageUrl: string; imageHint: string }> = {
+        Intimate: {
+          imageUrl: "/images/departments/intimate.jpg",
+          imageHint: "sleepwear, intimates",
+        },
+        Lounge: {
+          imageUrl: "/images/departments/lounge.jpg",
+          imageHint: "loungewear, cozy",
+        },
         default: {
-          imageUrl: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1080&q=80",
+          imageUrl: "/images/departments/default.jpg",
           imageHint: "fashion department",
         },
       };
 
+      const hint = imageUrlHints[deptName] || imageUrlHints.default;
       result.push({
         name: deptName,
         classes: products,
-        imageUrl: imageUrlHints.default.imageUrl,
-        imageHint: imageUrlHints.default.imageHint,
+        imageUrl: hint.imageUrl,
+        imageHint: hint.imageHint,
       });
     });
 

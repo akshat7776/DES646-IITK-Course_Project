@@ -4,8 +4,6 @@
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientDashboard } from "@/components/dashboard/client-dashboard";
-import { products } from "@/lib/data";
-import { analyzeCustomerFeedback } from "@/ai/flows/analyze-customer-feedback";
 
 export default function DashboardPage() {
   // This is now a client component, but we can still show a skeleton during initial load

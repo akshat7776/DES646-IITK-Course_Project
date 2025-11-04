@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { Product, Review } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import type { Product } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SentimentDistributionChart } from "./sentiment-distribution-chart";
 import { EmotionBreakdownChart } from "./emotion-breakdown-chart";
@@ -11,8 +10,6 @@ import { DepartmentRatingChart } from "./department-rating-chart";
 import { calculateAverageRating, getNPSCategory } from "@/lib/utils";
 import { Star, Users } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
-import { products as staticProducts } from "@/lib/data";
-import { analyzeCustomerFeedback } from "@/ai/flows/analyze-customer-feedback";
 import { Separator } from "../ui/separator";
 import {
   Select,
@@ -22,18 +19,27 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-type AnalyzedReview = Review & {
-  productName: string;
+type AnalyzedReview = {
+  text: string;
+  rating: number;
   department: string;
   sentiment: 'positive' | 'negative' | 'neutral';
   emotion: string;
-  intent: string;
-  tags: string[];
+};
+
+type SummaryStats = {
+  totalReviews: number;
+  averageRating: number;
+  nps: number;
+  positiveSentimentPercentage: number;
 };
 
 type AnalyticsData = {
   analyzedReviews: AnalyzedReview[];
-  products: Product[];
+  departmentRatings: { department: string; averageRating: number }[];
+  summary?: SummaryStats; // global summary from backend (full dataset)
+  sentimentCounts?: { positive?: number; negative?: number; neutral?: number };
+  emotionCounts?: { emotion: string; count: number }[];
 };
 
 export function ClientDashboard() {
@@ -42,42 +48,56 @@ export function ClientDashboard() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All");
 
   useEffect(() => {
-    const getAnalyticsData = async () => {
+    const getDashboardData = async () => {
       setIsLoading(true);
-      const allReviews = staticProducts.flatMap(p => 
-        p.reviews.map(r => ({ ...r, productName: p.name, department: p.department }))
-      );
-
-      const analysisPromises = allReviews.map(review => 
-        analyzeCustomerFeedback({ feedback: review.text, productName: review.productName })
-          .then(analysis => ({
-            ...review,
-            ...analysis,
-          }))
-          .catch(error => {
-            console.error("AI analysis failed for a review:", error);
-            return {
-              ...review,
-              sentiment: 'neutral',
-              emotion: 'unknown',
-              intent: 'unknown',
-              tags: [],
-            } as AnalyzedReview;
-          })
-      );
-      
-      const analyzedReviews = await Promise.all(analysisPromises);
-      
-      setData({ analyzedReviews, products: staticProducts });
-      setIsLoading(false);
+      try {
+        const params = new URLSearchParams();
+        if (selectedDepartment && selectedDepartment !== 'All') {
+          params.set('department', selectedDepartment);
+        }
+        const url = `/api/dashboard${params.toString() ? `?${params.toString()}` : ''}`;
+        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error(`Dashboard API ${res.status}`);
+        }
+        const data = await res.json();
+        const analyzedReviews: AnalyzedReview[] = (data.reviews || []).map((r: any) => ({
+          text: String(r.text || ''),
+          rating: Number(r.rating || 0),
+          department: String(r.department || 'Unknown'),
+          sentiment: (r.sentiment || 'neutral') as 'positive' | 'negative' | 'neutral',
+          emotion: String(r.emotion || 'neutral'),
+        }));
+        const departmentRatings = (data.department_ratings || []).map((d: any) => ({
+          department: String(d.department),
+          averageRating: Number(d.averageRating || 0),
+        }));
+        // Pull precomputed global summary stats from backend when available
+        const summary: SummaryStats = {
+          totalReviews: Number(data.total_reviews ?? analyzedReviews.length ?? 0),
+          averageRating: Number(data.average_rating ?? 0),
+          nps: Number(data.nps ?? 0),
+          positiveSentimentPercentage: Number(data.positive_sentiment_pct ?? 0),
+        };
+        const sentimentCounts = data.sentiment_counts as AnalyticsData['sentimentCounts'];
+        const emotionCounts = data.emotion_counts as AnalyticsData['emotionCounts'];
+        setData({ analyzedReviews, departmentRatings, summary, sentimentCounts, emotionCounts });
+      } catch (err) {
+        console.error('Failed to load dashboard data', err);
+        setData({ analyzedReviews: [], departmentRatings: [] });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    getAnalyticsData();
-  }, []);
+    getDashboardData();
+  }, [selectedDepartment]);
 
   const departments = useMemo(() => {
     if (!data) return [];
-    return ["All", ...Array.from(new Set(data.products.map(p => p.department)))];
+    const depts = new Set<string>();
+    data.analyzedReviews.forEach(r => depts.add(r.department));
+    return ["All", ...Array.from(depts)];
   }, [data]);
 
   const filteredData = useMemo(() => {
@@ -91,36 +111,52 @@ export function ClientDashboard() {
   }, [selectedDepartment, data]);
   
   const stats = useMemo(() => {
-    if (!filteredData || filteredData.length === 0) return { totalReviews: 0, averageRating: 0, nps: 0, positiveSentimentPercentage: 0};
-
+    // If viewing All and we have summary, use exact full-dataset stats
+    if (selectedDepartment === 'All' && data?.summary) {
+      return data.summary;
+    }
+    // For department views, if we have aggregated sentiment counts and department average, use them where possible
+    if (selectedDepartment !== 'All' && data) {
+      const sc = data.sentimentCounts;
+      const totalFromCounts = sc ? (Number(sc.positive || 0) + Number(sc.neutral || 0) + Number(sc.negative || 0)) : 0;
+      const deptAvgObj = data.departmentRatings.find(d => d.department === selectedDepartment);
+      const averageRating = deptAvgObj ? Number(deptAvgObj.averageRating || 0) : calculateAverageRating(filteredData);
+      const totalReviews = totalFromCounts || filteredData.length;
+      const positiveSentimentPercentage = totalFromCounts
+        ? (Number(sc?.positive || 0) / totalFromCounts) * 100
+        : (filteredData.length ? (filteredData.filter(r => r.sentiment === 'positive').length / filteredData.length) * 100 : 0);
+      // NPS per-department not precomputed; fallback to sample-based
+      const promoters = filteredData.filter(r => getNPSCategory(r.rating) === 'promoter').length;
+      const detractors = filteredData.filter(r => getNPSCategory(r.rating) === 'detractor').length;
+      const nps = filteredData.length > 0 ? ((promoters - detractors) / filteredData.length) * 100 : 0;
+      return { totalReviews, averageRating, nps, positiveSentimentPercentage } as SummaryStats;
+    }
+    // Fallback to sample-based when nothing else is available
+    if (!filteredData || filteredData.length === 0) {
+      return { totalReviews: 0, averageRating: 0, nps: 0, positiveSentimentPercentage: 0 } as SummaryStats;
+    }
     const totalReviews = filteredData.length;
     const averageRating = calculateAverageRating(filteredData);
-    
     const promoters = filteredData.filter(r => getNPSCategory(r.rating) === 'promoter').length;
     const detractors = filteredData.filter(r => getNPSCategory(r.rating) === 'detractor').length;
     const nps = totalReviews > 0 ? ((promoters - detractors) / totalReviews) * 100 : 0;
-
     const positiveSentiment = filteredData.filter(r => r.sentiment === 'positive').length;
     const positiveSentimentPercentage = totalReviews > 0 ? (positiveSentiment / totalReviews) * 100 : 0;
-
-    return {
-      totalReviews,
-      averageRating,
-      nps,
-      positiveSentimentPercentage
-    }
-  }, [filteredData]);
+    return { totalReviews, averageRating, nps, positiveSentimentPercentage } as SummaryStats;
+  }, [filteredData, selectedDepartment, data]);
 
   const allDepartmentsData = useMemo(() => {
-      if (!data) return [];
-      const departmentRatings = departments.filter(d => d !== 'All').map(dept => {
-          const deptReviews = data.analyzedReviews.filter(r => r.department === dept);
-          return {
-              department: dept,
-              averageRating: calculateAverageRating(deptReviews)
-          }
-      });
-      return departmentRatings;
+    if (!data) return [];
+    if (data.departmentRatings?.length) return data.departmentRatings;
+    // fallback compute client-side if not provided
+    const departmentRatings = departments.filter(d => d !== 'All').map(dept => {
+      const deptReviews = data.analyzedReviews.filter(r => r.department === dept);
+      return {
+        department: dept,
+        averageRating: calculateAverageRating(deptReviews)
+      }
+    });
+    return departmentRatings;
   }, [data, departments]);
 
   if (isLoading || !data) {
@@ -198,8 +234,8 @@ export function ClientDashboard() {
         <div>
             <h2 className="text-2xl font-bold tracking-tight mb-4">Sentiment &amp; Emotion Analysis {selectedDepartment !== 'All' && `for ${selectedDepartment}`}</h2>
              <div className="grid gap-8 md:grid-cols-2">
-                <SentimentDistributionChart data={filteredData} />
-                <EmotionBreakdownChart data={filteredData} />
+                <SentimentDistributionChart data={filteredData} counts={data?.sentimentCounts} />
+                <EmotionBreakdownChart data={filteredData} counts={data?.emotionCounts} />
             </div>
         </div>
     </div>

@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/chart"
 
 type EmotionBreakdownChartProps = {
-  data: {
+  data?: {
     emotion: string
   }[]
+  counts?: { emotion: string; count: number }[]
 }
 
 const chartConfig = {
@@ -28,18 +29,24 @@ const chartConfig = {
   },
 }
 
-export function EmotionBreakdownChart({ data }: EmotionBreakdownChartProps) {
+export function EmotionBreakdownChart({ data = [], counts }: EmotionBreakdownChartProps) {
   const emotionCounts = useMemo(() => {
-    const counts: { [key: string]: number } = {}
+    if (counts && counts.length) {
+      return counts
+        .map(({ emotion, count }) => ({ emotion: String(emotion).toLowerCase(), count: Number(count) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+    }
+    const counter: { [key: string]: number } = {}
     data.forEach(review => {
-      const emotion = review.emotion.toLowerCase();
-      counts[emotion] = (counts[emotion] || 0) + 1
+      const emotion = String(review.emotion || '').toLowerCase();
+      counter[emotion] = (counter[emotion] || 0) + 1
     })
-    return Object.entries(counts)
+    return Object.entries(counter)
       .map(([emotion, count]) => ({ emotion, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10) // show top 10 emotions
-  }, [data])
+      .slice(0, 10)
+  }, [data, counts])
 
   return (
     <Card>
