@@ -44,6 +44,10 @@ htmlcov/
 outputs/
 Womens Clothing E-Commerce Reviews.csv
 
+# Explicit dashboard caches (already covered by outputs/; listed for clarity)
+outputs/dashboard_reviews.jsonl
+outputs/dashboard_summary.json
+
 # FAISS indexes and artifacts
 faiss_index/
 faiss_index_native/
@@ -64,6 +68,12 @@ frontend/npm-debug.log*
 frontend/yarn-error.log
 frontend/.env
 frontend/.env.*
+frontend/.modified
+frontend/.idx/
+
+# Root-level misc markers
+.modified
+.idx/
 
 # Jupyter notebooks checkpoints are covered above; keep notebooks themselves
 

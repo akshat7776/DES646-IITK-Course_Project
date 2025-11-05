@@ -47,6 +47,8 @@ export function ClientDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All");
+  // Preserve a master list of departments so the dropdown always shows all options
+  const [departmentsMaster, setDepartmentsMaster] = useState<string[]>([]);
 
   useEffect(() => {
     const getDashboardData = async () => {
@@ -73,6 +75,18 @@ export function ClientDashboard() {
           department: String(d.department),
           averageRating: Number(d.averageRating || 0),
         }));
+        // Update the master list only when we see a longer (more complete) list
+        const fromRatings: string[] = departmentRatings.map((d: { department: string }) => d.department).filter(Boolean);
+        if (fromRatings.length) {
+          setDepartmentsMaster(prev => {
+            // keep the longer list to avoid shrinking to a filtered subset
+            const prevSet = new Set(prev);
+            const nextSet = new Set(fromRatings);
+            // If previous already seems more complete, keep it
+            if (prevSet.size >= nextSet.size) return Array.from(prevSet) as string[];
+            return Array.from(nextSet) as string[];
+          });
+        }
         // Pull precomputed global summary stats from backend when available
         const summary: SummaryStats = {
           totalReviews: Number(data.total_reviews ?? analyzedReviews.length ?? 0),
@@ -96,6 +110,8 @@ export function ClientDashboard() {
   }, [selectedDepartment]);
 
   const departments = useMemo(() => {
+    // If we have a preserved master list, always use it
+    if (departmentsMaster.length) return ["All", ...departmentsMaster];
     if (!data) return ["All"];
     // Prefer the authoritative list from backend aggregates
     const fromRatings = (data.departmentRatings || []).map(d => d.department).filter(Boolean);
@@ -104,7 +120,7 @@ export function ClientDashboard() {
     const depts = new Set<string>();
     data.analyzedReviews.forEach(r => depts.add(r.department));
     return ["All", ...Array.from(depts)];
-  }, [data]);
+  }, [departmentsMaster, data]);
 
   const filteredData = useMemo(() => {
     if (!data) return [];
@@ -167,6 +183,18 @@ export function ClientDashboard() {
     });
     return departmentRatings;
   }, [data, departments]);
+
+  // Prefer aggregated emotion counts when they show variety; otherwise fall back to sample data
+  const emotionCountsToUse = useMemo(() => {
+    const counts = data?.emotionCounts;
+    if (!counts || !counts.length) return undefined;
+    const unique = new Set(counts.map(c => String(c.emotion || '').toLowerCase()));
+    if (unique.size <= 1) return undefined; // degenerate (all one emotion) -> let chart derive from sample data
+    const total = counts.reduce((acc, c) => acc + Number(c.count || 0), 0);
+    const max = Math.max(...counts.map(c => Number(c.count || 0)));
+    if (total > 0 && max / total >= 0.95) return undefined; // overly dominant -> fall back
+    return counts;
+  }, [data]);
 
   if (isLoading || !data) {
     return <DashboardSkeleton />;
@@ -244,7 +272,7 @@ export function ClientDashboard() {
             <h2 className="text-2xl font-bold tracking-tight mb-4">Sentiment &amp; Emotion Analysis {selectedDepartment !== 'All' && `for ${selectedDepartment}`}</h2>
              <div className="grid gap-8 md:grid-cols-2">
                 <SentimentDistributionChart data={filteredData} counts={data?.sentimentCounts} />
-                <EmotionBreakdownChart data={filteredData} counts={data?.emotionCounts} />
+        <EmotionBreakdownChart data={filteredData} counts={emotionCountsToUse} />
             </div>
         </div>
     </div>

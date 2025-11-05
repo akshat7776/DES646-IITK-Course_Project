@@ -7,6 +7,12 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
+try:
+	# For optimal one-to-one mapping between clusters and emotions
+	from scipy.optimize import linear_sum_assignment  # type: ignore
+	_HAS_SCIPY = True
+except Exception:  # pragma: no cover
+	_HAS_SCIPY = False
 
 try:
 	from sentence_transformers import SentenceTransformer
@@ -46,10 +52,27 @@ def _kmeans_cluster(embeddings: np.ndarray, k: int, random_state: int = 42) -> T
 
 
 def _label_clusters(centers: np.ndarray, emotion_embs: np.ndarray, emotion_names: List[str]) -> Dict[int, str]:
-	# centers: (k, d), emotion_embs: (7, d)
-	sims = cosine_similarity(centers, emotion_embs)  # (k, 7)
+	"""Map each cluster center to an emotion.
+
+	If SciPy is available and the number of clusters equals the number of emotions,
+	use an optimal one-to-one assignment (Hungarian algorithm) to reduce duplicate
+	mappings (e.g., everything going to 'joy' or 'neutral'). Otherwise, fall back to
+	per-row argmax.
+	"""
+	k = centers.shape[0]
+	m = emotion_embs.shape[0]
+	sims = cosine_similarity(centers, emotion_embs)  # (k, m)
 	cluster_to_emotion: Dict[int, str] = {}
-	for i in range(centers.shape[0]):
+
+	if _HAS_SCIPY and k == m:
+		# Maximize total similarity -> minimize negative similarity
+		row_ind, col_ind = linear_sum_assignment(-sims)
+		for ci, ej in zip(row_ind, col_ind):
+			cluster_to_emotion[int(ci)] = emotion_names[int(ej)]
+		return cluster_to_emotion
+
+	# Fallback: independent argmax per cluster
+	for i in range(k):
 		j = int(np.argmax(sims[i]))
 		cluster_to_emotion[i] = emotion_names[j]
 	return cluster_to_emotion
@@ -58,7 +81,7 @@ def _label_clusters(centers: np.ndarray, emotion_embs: np.ndarray, emotion_names
 def cluster_emotions(
 	texts: List[str],
 	*,
-	k: int = 7,
+	k: int | None = None,
 	model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
 ) -> List[str]:
 	"""Cluster texts and return an emotion label per text using centroid similarity.
@@ -74,8 +97,9 @@ def cluster_emotions(
 
 	model = _load_model(model_name)
 	X = _embed(model, texts)
-	# If number of texts < k, reduce k
-	k_eff = max(1, min(k, len(texts)))
+	# If k not provided, default to number of emotions (bounded by number of texts)
+	k_target = len(EMOTIONS) if k is None else int(k)
+	k_eff = max(1, min(k_target, len(texts)))
 	labels, centers = _kmeans_cluster(X, k=k_eff)
 
 	# Emotion reference embeddings
@@ -89,7 +113,7 @@ def cluster_emotions(
 
 if __name__ == "__main__":
 	feedback = [
-		"This shirt is very flattering to all due to the adjustable front tie. it is the perfect length to wear with leggings and it is sleeveless so it pairs well with any cardigan. love this shirt!!!"
+		"I didn't like it at all, it was a terrible experience."
 	]
 	preds = cluster_emotions(feedback, k=7)
 	for emo in preds:

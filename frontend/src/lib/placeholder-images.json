@@ -1,6 +1,6 @@
 {
   "placeholderImages": [
-    { "id": "Dresses", "description": "Dresses category", "imageUrl": "/images/departments/dresses.jpg", "imageHint": "dresses rack, apparel" },
+    { "id": "Dresses", "description": "Dresses category", "imageUrl": "/images/departments/dress.jpg", "imageHint": "dresses rack, apparel" },
     { "id": "Knits", "description": "Knits category", "imageUrl": "/images/departments/knits.jpg", "imageHint": "knits, sweaters" },
     { "id": "Blouses", "description": "Blouses category", "imageUrl": "/images/departments/blouses.jpg", "imageHint": "blouses, tops" },
     { "id": "Sweaters", "description": "Sweaters category", "imageUrl": "/images/departments/sweaters.jpg", "imageHint": "sweaters" },
@@ -11,13 +11,13 @@
     { "id": "Jackets", "description": "Jackets category", "imageUrl": "/images/departments/jackets.jpg", "imageHint": "jackets, outerwear" },
     { "id": "Lounge", "description": "Lounge category", "imageUrl": "/images/departments/loungewear.jpg", "imageHint": "loungewear" },
     { "id": "Swim", "description": "Swim category", "imageUrl": "/images/departments/swim.jpg", "imageHint": "swimwear" },
-    { "id": "Outerwear", "description": "Outerwear category", "imageUrl": "/images/departments/jackets.jpg", "imageHint": "outerwear" },
+    { "id": "Outerwear", "description": "Outerwear category", "imageUrl": "/images/departments/outerwear.jpg", "imageHint": "outerwear" },
     { "id": "Shorts", "description": "Shorts category", "imageUrl": "/images/departments/shorts.jpg", "imageHint": "shorts" },
-    { "id": "Sleep", "description": "Sleep category", "imageUrl": "/images/departments/sleep.jpg", "imageHint": "sleepwear" },
+    { "id": "Sleep", "description": "Sleep category", "imageUrl": "/images/departments/sleepwear.jpg", "imageHint": "sleepwear" },
     { "id": "Legwear", "description": "Legwear category", "imageUrl": "/images/departments/legwear.jpg", "imageHint": "legwear" },
     { "id": "Intimates", "description": "Intimates category", "imageUrl": "/images/departments/intimate.svg", "imageHint": "intimates" },
     { "id": "Layering", "description": "Layering category", "imageUrl": "/images/departments/layering.jpg", "imageHint": "layering" },
-    { "id": "Trend", "description": "Trend category", "imageUrl": "/images/departments/trend.jpg", "imageHint": "trend" },
+    { "id": "Trend", "description": "Trend category", "imageUrl": "/images/departments/trendy.jpg", "imageHint": "trend" },
     { "id": "Casual bottoms", "description": "Casual bottoms category", "imageUrl": "/images/departments/Casual bottoms.jpg", "imageHint": "casual bottoms" },
     { "id": "Chemises", "description": "Chemises category", "imageUrl": "/images/departments/chemises.jpg", "imageHint": "chemises" }
 
