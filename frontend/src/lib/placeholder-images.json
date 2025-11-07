@@ -2,8 +2,8 @@
   "placeholderImages": [
     { "id": "Dresses", "description": "Dresses category", "imageUrl": "/images/departments/dress.jpg", "imageHint": "dresses rack, apparel" },
     { "id": "Knits", "description": "Knits category", "imageUrl": "/images/departments/knits.jpg", "imageHint": "knits, sweaters" },
-    { "id": "Blouses", "description": "Blouses category", "imageUrl": "/images/departments/blouses.jpg", "imageHint": "blouses, tops" },
-    { "id": "Sweaters", "description": "Sweaters category", "imageUrl": "/images/departments/sweaters.jpg", "imageHint": "sweaters" },
+    { "id": "Blouses", "description": "Blouses category", "imageUrl": "/images/departments/blouse.jpg", "imageHint": "blouses, tops" },
+    { "id": "Sweaters", "description": "Sweaters category", "imageUrl": "/images/departments/sweater.jpg", "imageHint": "sweaters" },
     { "id": "Pants", "description": "Pants category", "imageUrl": "/images/departments/pants.jpg", "imageHint": "pants" },
     { "id": "Jeans", "description": "Jeans category", "imageUrl": "/images/departments/jeans.jpg", "imageHint": "jeans" },
     { "id": "Fine gauge", "description": "Fine gauge category", "imageUrl": "/images/departments/fine gauge.jpg", "imageHint": "fine gauge knits" },

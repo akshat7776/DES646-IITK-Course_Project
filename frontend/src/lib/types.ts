@@ -2,7 +2,7 @@ export type Review = {
   id: number;
   author: string;
   date: string;
-  rating: number; // 1-5
+  rating: number; 
   text: string;
   // Optional fields carried from CSV when available
   title?: string;
@@ -14,7 +14,7 @@ export type Product = {
   id: string;
   name: string;
   department: string;
-  productAge: string; // e.g., "3 months"
+  productAge: string; 
   imageId: string; // to link to placeholder-images.json
   reviews: Review[];
 };
