@@ -2,6 +2,10 @@
 
 Analyze customer reviews at scale with a FastAPI backend and a Next.js dashboard. The app precomputes sentiment and emotions for fast, accurate aggregates and serves a compact sample of reviews for UI rendering.
 
+## Overall architecture
+
+![Overall Architecture](Architecture/Overall%20Architecture.png)
+
 ## What's inside
 
 - Backend (Python / FastAPI)
@@ -21,6 +25,13 @@ Analyze customer reviews at scale with a FastAPI backend and a Next.js dashboard
 - Windows PowerShell (v5+) or Terminal
 - Python 3.10+ recommended
 - Node.js 18+ and npm 9+
+
+## Clone the repository
+
+```powershell
+git clone https://github.com/akshat7776/DES646-IITK-Course_Project.git DES646-PROJECT
+cd DES646-PROJECT
+```
 
 ## Backend setup (FastAPI)
 
