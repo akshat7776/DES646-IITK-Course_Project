@@ -15,7 +15,7 @@
     { "id": "Shorts", "description": "Shorts category", "imageUrl": "/images/departments/shorts.jpg", "imageHint": "shorts" },
     { "id": "Sleep", "description": "Sleep category", "imageUrl": "/images/departments/sleepwear.jpg", "imageHint": "sleepwear" },
     { "id": "Legwear", "description": "Legwear category", "imageUrl": "/images/departments/legwear.jpg", "imageHint": "legwear" },
-    { "id": "Intimates", "description": "Intimates category", "imageUrl": "/images/departments/intimate.svg", "imageHint": "intimates" },
+    { "id": "Intimates", "description": "Intimates category", "imageUrl": "/images/departments/intimates.jpg", "imageHint": "intimates" },
     { "id": "Layering", "description": "Layering category", "imageUrl": "/images/departments/layering.jpg", "imageHint": "layering" },
     { "id": "Trend", "description": "Trend category", "imageUrl": "/images/departments/trendy.jpg", "imageHint": "trend" },
     { "id": "Casual bottoms", "description": "Casual bottoms category", "imageUrl": "/images/departments/Casual bottoms.jpg", "imageHint": "casual bottoms" },

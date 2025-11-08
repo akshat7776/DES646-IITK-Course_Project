@@ -100,7 +100,7 @@ export default function DepartmentBrowser() {
       // Drop SVG placeholders into that folder (intimate.svg, dresses.svg, bottoms.svg, tops.svg, jackets.svg, trend.svg, lounge.svg, default.svg)
       const imageUrlHints: Record<string, { imageUrl: string; imageHint: string }> = {
         Intimate: {
-          imageUrl: "/images/departments/intimate.svg",
+          imageUrl: "/images/departments/intimates.jpg",
           imageHint: "sleepwear, intimates",
         },
         Dresses: {
@@ -120,7 +120,7 @@ export default function DepartmentBrowser() {
           imageHint: "jackets, outerwear",
         },
         Trend: {
-          imageUrl: "/images/departments/default.svg",
+          imageUrl: "/images/departments/trend.jpg",
           imageHint: "trendy apparel",
         },
         Lounge: {
