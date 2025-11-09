@@ -1,0 +1,32 @@
+{
+  "total_reviews": 22628,
+  "average_rating": 4.183091744741029,
+  "nps": 66.57680749513877,
+  "positive_sentiment_pct": 91.13045783984444,
+  "department_ratings": [
+    {
+      "department": "Bottoms",
+      "averageRating": 4.278809393773894
+    },
+    {
+      "department": "Dresses",
+      "averageRating": 4.138812042310822
+    },
+    {
+      "department": "Intimate",
+      "averageRating": 4.27102238354507
+    },
+    {
+      "department": "Jackets",
+      "averageRating": 4.254491017964072
+    },
+    {
+      "department": "Tops",
+      "averageRating": 4.157742834394904
+    },
+    {
+      "department": "Trend",
+      "averageRating": 3.8389830508474576
+    }
+  ]
+}
