@@ -1,7 +1,9 @@
-## Feedback Analyzer
+## Crowdsourced product feedback analyzer using NLP
 
 Analyze customer reviews at scale with a FastAPI backend and a Next.js dashboard.  
 The app precomputes sentiment and emotions for fast, accurate aggregates and serves a compact sample of reviews for UI rendering.
+
+## Working Demo video [here](https://drive.google.com/file/d/1IBbhYFM1QGM8jDN1S4UCwzl0tQiz450k/view?usp=sharing)
 
 ## Overall architecture
 
